@@ -6,6 +6,10 @@ import { Incident } from "../models/Incident";
 import { RCA } from "../models/RCA";
 import { Experiment } from "../models/Experiment";
 import { DevOpsAction } from "../models/DevOpsAction";
+import { CodeIssue } from "../models/CodeIssue";
+import { CodeRepair } from "../models/CodeRepair";
+import { Deployment } from "../models/Deployment";
+import { DeploymentVerification } from "../models/DeploymentVerification";
 
 export const getTraceability = async (
   _req: Request,
@@ -33,19 +37,35 @@ export const getFullTraceGraph = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { requirementId } = req.query;
+    const { requirementId, projectId } = req.query;
 
-    const reqFilter = requirementId ? { requirementId: String(requirementId) } : {};
+    const reqFilter: Record<string, unknown> = {};
+    if (requirementId) reqFilter.requirementId = String(requirementId);
+    if (projectId) reqFilter.projectId = String(projectId);
 
-    const [requirements, slos, incidents, rcas, experiments, devopsActions] =
-      await Promise.all([
-        Requirement.find(reqFilter).sort({ createdAt: -1 }),
-        SLO.find().sort({ createdAt: -1 }),
-        Incident.find().sort({ createdAt: -1 }),
-        RCA.find().sort({ createdAt: -1 }),
-        Experiment.find().sort({ createdAt: -1 }),
-        DevOpsAction.find().sort({ createdAt: -1 }),
-      ]);
+    const [
+      requirements,
+      slos,
+      incidents,
+      rcas,
+      experiments,
+      devopsActions,
+      codeIssues,
+      codeRepairs,
+      deployments,
+      verifications,
+    ] = await Promise.all([
+      Requirement.find(reqFilter).sort({ createdAt: -1 }),
+      SLO.find().sort({ createdAt: -1 }),
+      Incident.find().sort({ createdAt: -1 }),
+      RCA.find().sort({ createdAt: -1 }),
+      Experiment.find().sort({ createdAt: -1 }),
+      DevOpsAction.find().sort({ createdAt: -1 }),
+      CodeIssue.find().sort({ createdAt: -1 }),
+      CodeRepair.find().sort({ createdAt: -1 }),
+      Deployment.find().sort({ createdAt: -1 }),
+      DeploymentVerification.find().sort({ createdAt: -1 }),
+    ]);
 
     // Build hierarchical graph for each requirement
     const graph = requirements.map((reqItem) => {
@@ -64,6 +84,18 @@ export const getFullTraceGraph = async (
       const linkedActions = devopsActions.filter(
         (a) => a.requirementId === reqItem.requirementId || a.service === reqItem.service
       );
+      const linkedIssues = codeIssues.filter(
+        (ci) => ci.projectId === reqItem.projectId || ci.service === reqItem.service
+      );
+      const linkedRepairs = codeRepairs.filter(
+        (cr) => cr.projectId === reqItem.projectId || cr.service === reqItem.service
+      );
+      const linkedDeployments = deployments.filter(
+        (d) => d.projectId === reqItem.projectId || d.service === reqItem.service
+      );
+      const linkedVerifications = verifications.filter(
+        (v) => v.projectId === reqItem.projectId || v.service === reqItem.service
+      );
 
       return {
         requirement: reqItem,
@@ -72,6 +104,10 @@ export const getFullTraceGraph = async (
         rcas: linkedRCAs,
         experiments: linkedExperiments,
         devopsActions: linkedActions,
+        codeIssues: linkedIssues,
+        codeRepairs: linkedRepairs,
+        deployments: linkedDeployments,
+        verifications: linkedVerifications,
       };
     });
 

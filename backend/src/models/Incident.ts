@@ -10,6 +10,7 @@ export interface IIncidentMetrics {
 
 export interface IIncident extends Document {
   incidentId: string;
+  projectId?: string;
   requirementId: string;
   sloId: string;
   service: string;
@@ -32,6 +33,10 @@ const incidentSchema = new Schema<IIncident>(
       type: String,
       required: true,
       unique: true,
+      trim: true,
+    },
+    projectId: {
+      type: String,
       trim: true,
     },
     requirementId: {

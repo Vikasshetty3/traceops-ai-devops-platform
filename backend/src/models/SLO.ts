@@ -2,6 +2,7 @@ import mongoose, { Document, Schema } from "mongoose";
 
 export interface ISLO extends Document {
   sloId: string;
+  projectId?: string;
   requirementId: string;
   service: string;
   metric: string;
@@ -12,6 +13,9 @@ export interface ISLO extends Document {
   window: string;
   severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
   status: "ACTIVE" | "INACTIVE";
+  sloType?: "EXPLICIT" | "INFERRED";
+  sourceFile?: string;
+  confidence?: number;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -22,6 +26,10 @@ const sloSchema = new Schema<ISLO>(
       type: String,
       required: true,
       unique: true,
+      trim: true,
+    },
+    projectId: {
+      type: String,
       trim: true,
     },
     requirementId: {
@@ -72,6 +80,19 @@ const sloSchema = new Schema<ISLO>(
       type: String,
       enum: ["ACTIVE", "INACTIVE"],
       default: "ACTIVE",
+    },
+    sloType: {
+      type: String,
+      enum: ["EXPLICIT", "INFERRED"],
+      default: "EXPLICIT",
+    },
+    sourceFile: {
+      type: String,
+      trim: true,
+    },
+    confidence: {
+      type: Number,
+      default: 1.0,
     },
   },
   {

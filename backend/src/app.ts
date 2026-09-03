@@ -20,6 +20,8 @@ import geminiRcaRoutes from "./routes/geminiRcaRoutes";
 import experimentRoutes from "./routes/experimentRoutes";
 import devopsRoutes from "./routes/devopsRoutes";
 import metricsRoutes from "./routes/metricsRoutes";
+import projectRoutes from "./routes/projectRoutes";
+import repairRoutes from "./routes/repairRoutes";
 import { getPrometheusMetrics } from "./controllers/metricsController";
 
 const app = express();
@@ -40,6 +42,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Core API endpoints
+app.use("/api/projects", projectRoutes);
 app.use("/api/requirements", requirementRoutes);
 app.use("/api/slos", sloRoutes);
 app.use("/api/traceability", traceabilityRoutes);
@@ -52,6 +55,7 @@ app.use("/api/gemini-rca", geminiRcaRoutes);
 app.use("/api/experiments", experimentRoutes);
 app.use("/api/devops", devopsRoutes);
 app.use("/api/metrics", metricsRoutes);
+app.use("/api", repairRoutes);
 
 // Prometheus scraper endpoint
 app.get("/metrics", getPrometheusMetrics);
@@ -65,6 +69,7 @@ app.get("/", (_req, res) => {
     message: "TraceOps backend API is operational.",
     endpoints: {
       health: "/api/health",
+      projects: "/api/projects",
       metrics: "/metrics",
       requirements: "/api/requirements",
       slos: "/api/slos",
@@ -76,6 +81,8 @@ app.get("/", (_req, res) => {
       mlPredict: "/api/ml/predict",
       experiments: "/api/experiments",
       devops: "/api/devops",
+      repairs: "/api/repairs",
+      deployments: "/api/deployments",
     },
     frontend: "http://localhost:5173",
   });

@@ -2,6 +2,7 @@ import mongoose, { Document, Schema } from "mongoose";
 
 export interface IRequirement extends Document {
   requirementId: string;
+  projectId?: string;
   title: string;
   description: string;
   service: string;
@@ -12,6 +13,9 @@ export interface IRequirement extends Document {
   unit?: string;
   priority: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
   status: "ACTIVE" | "INACTIVE";
+  requirementType?: "EXPLICIT" | "INFERRED";
+  sourceFile?: string;
+  confidence?: number;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -22,6 +26,10 @@ const requirementSchema = new Schema<IRequirement>(
       type: String,
       required: true,
       unique: true,
+      trim: true,
+    },
+    projectId: {
+      type: String,
       trim: true,
     },
     title: {
@@ -72,6 +80,19 @@ const requirementSchema = new Schema<IRequirement>(
       type: String,
       enum: ["ACTIVE", "INACTIVE"],
       default: "ACTIVE",
+    },
+    requirementType: {
+      type: String,
+      enum: ["EXPLICIT", "INFERRED"],
+      default: "EXPLICIT",
+    },
+    sourceFile: {
+      type: String,
+      trim: true,
+    },
+    confidence: {
+      type: Number,
+      default: 1.0,
     },
   },
   {

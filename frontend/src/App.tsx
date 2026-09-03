@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import type {
+  Project,
   Requirement,
   SLO,
   Incident,
@@ -10,6 +11,8 @@ import type {
   ServiceTelemetry,
 } from "./types";
 import { api } from "./services/api";
+import { ProjectsTab } from "./components/Projects/ProjectsTab";
+import { RepairTab } from "./components/Repair/RepairTab";
 import { OverviewTab } from "./components/Dashboard/OverviewTab";
 import { RequirementsTab } from "./components/Requirements/RequirementsTab";
 import { SLOsTab } from "./components/SLOs/SLOsTab";
@@ -20,6 +23,7 @@ import { TraceabilityTab } from "./components/Traceability/TraceabilityTab";
 import { ResearchTab } from "./components/Research/ResearchTab";
 import { LoadingState, ErrorState } from "./components/common/FeedbackStates";
 import {
+  FolderGit2,
   Activity,
   Layers,
   Zap,
@@ -30,6 +34,7 @@ import {
   BarChart3,
   RefreshCw,
   Server,
+  Wrench,
 } from "lucide-react";
 import "./App.css";
 
@@ -39,6 +44,7 @@ export const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   // Core Data States
+  const [projects, setProjects] = useState<Project[]>([]);
   const [requirements, setRequirements] = useState<Requirement[]>([]);
   const [slos, setSlos] = useState<SLO[]>([]);
   const [incidents, setIncidents] = useState<Incident[]>([]);
@@ -53,8 +59,9 @@ export const App: React.FC = () => {
   const loadAllData = useCallback(async () => {
     try {
       setError(null);
-      const [reqs, slosData, incs, rcaData, exps, actions, telem, graph] =
+      const [projs, reqs, slosData, incs, rcaData, exps, actions, telem, graph] =
         await Promise.all([
+          api.getProjects().catch(() => []),
           api.getRequirements().catch(() => []),
           api.getSLOs().catch(() => []),
           api.getIncidents().catch(() => []),
@@ -65,6 +72,7 @@ export const App: React.FC = () => {
           api.getTraceGraph().catch(() => []),
         ]);
 
+      setProjects(projs || []);
       setRequirements(reqs || []);
       setSlos(slosData || []);
       setIncidents(incs || []);
@@ -205,6 +213,8 @@ export const App: React.FC = () => {
 
   const tabs = [
     { id: "overview", label: "Overview", icon: <Activity className="w-4 h-4" /> },
+    { id: "projects", label: "Projects", icon: <FolderGit2 className="w-4 h-4" /> },
+    { id: "repair", label: "Autonomous Repair", icon: <Wrench className="w-4 h-4" /> },
     { id: "requirements", label: "Requirements", icon: <Layers className="w-4 h-4" /> },
     { id: "slos", label: "SLO Registry", icon: <Zap className="w-4 h-4" /> },
     { id: "incidents", label: "Incidents & ML", icon: <ShieldAlert className="w-4 h-4" /> },
@@ -275,6 +285,21 @@ export const App: React.FC = () => {
                 onNavigateTab={(tab) => setActiveTab(tab)}
               />
             )}
+
+            {activeTab === "projects" && (
+              <ProjectsTab
+                projects={projects}
+                requirements={requirements}
+                slos={slos}
+                onRefresh={loadAllData}
+                onSelectProjectTraceability={(_projectId) => {
+                  setSelectedReqId("");
+                  setActiveTab("traceability");
+                }}
+              />
+            )}
+
+            {activeTab === "repair" && <RepairTab />}
 
             {activeTab === "requirements" && (
               <RequirementsTab

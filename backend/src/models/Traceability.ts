@@ -2,10 +2,14 @@ import mongoose, { Document, Schema } from "mongoose";
 
 export interface ITraceability extends Document {
   traceId: string;
+  projectId?: string;
   requirementId: string;
   sloId: string;
   service: string;
   metric: string;
+  issueId?: string;
+  repairId?: string;
+  deploymentId?: string;
   prometheusMetric?: string;
   runtimeResource?: string;
   kubernetesNamespace?: string;
@@ -19,6 +23,11 @@ const traceabilitySchema = new Schema<ITraceability>(
       type: String,
       required: true,
       unique: true,
+      trim: true,
+    },
+
+    projectId: {
+      type: String,
       trim: true,
     },
 
@@ -43,6 +52,21 @@ const traceabilitySchema = new Schema<ITraceability>(
     metric: {
       type: String,
       required: true,
+      trim: true,
+    },
+
+    issueId: {
+      type: String,
+      trim: true,
+    },
+
+    repairId: {
+      type: String,
+      trim: true,
+    },
+
+    deploymentId: {
+      type: String,
       trim: true,
     },
 

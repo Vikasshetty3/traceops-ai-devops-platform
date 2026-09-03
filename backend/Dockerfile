@@ -23,6 +23,9 @@ RUN npm run build
 
 FROM node:20-alpine AS runner
 
+# Install git, curl, and certificates for repository acquisition
+RUN apk add --no-cache git curl ca-certificates
+
 WORKDIR /app/backend
 
 # Copy backend package manifests
