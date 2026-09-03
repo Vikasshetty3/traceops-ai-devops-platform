@@ -1,0 +1,31 @@
+groups:
+  - name: traceops_slo_alerts
+    rules:
+      - alert: CheckoutLatencySLOViolation
+        expr: http_request_duration_seconds{service="Checkout"} > 2.0
+        for: 1m
+        labels:
+          severity: critical
+          requirementId: REQ-001
+          service: Checkout
+        annotations:
+          summary: "Checkout latency breached 2.0s SLO threshold"
+          description: "Current p95 latency is {{ $value }}s on Checkout service."
+
+      - alert: ServiceHighCPUUtilization
+        expr: service_cpu_utilization_percent > 85
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Service CPU load elevated"
+          description: "Service {{ $labels.service }} CPU is at {{ $value }}%."
+
+      - alert: HighErrorRateBreach
+        expr: service_error_rate_percent > 1.0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service Error Rate breached threshold"
+          description: "Service {{ $labels.service }} is experiencing {{ $value }}% errors."

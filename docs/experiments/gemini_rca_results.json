@@ -1,0 +1,128 @@
+{
+  "totalScenarios": 10,
+  "rcaAccuracy": 0.9,
+  "averageConfidence": 0.942,
+  "averageResponseTimeMs": 4052.18,
+  "scenarios": [
+    {
+      "id": "RCA-01",
+      "service": "Checkout",
+      "metric": "p95_latency",
+      "groundTruthCause": "Database connection pool exhaustion",
+      "predictedRootCause": "Database performance degradation leading to connection pool exhaustion and increased query execution times on checkout_db.",
+      "confidence": 0.95,
+      "recommendedAction": "Investigate the 'checkout_db' for specific performance bottlenecks such as long-running queries, missing indexes, or resource saturation (CPU/IO). Optimize identified slow queries and consider scaling database resources if necessary. Temporarily increasing connection pool size might offer short-term relief, but optimizing the database is the primary fix.",
+      "evidenceCount": 5,
+      "responseTimeMs": 7558.49,
+      "isCorrect": true
+    },
+    {
+      "id": "RCA-02",
+      "service": "Authentication",
+      "metric": "p95_latency",
+      "groundTruthCause": "High CPU utilization / JWT cryptographic signature verification CPU saturation",
+      "predictedRootCause": "CPU saturation due to intense cryptographic operations for RSA token verification, leading to worker thread exhaustion and request backlog.",
+      "confidence": 0.95,
+      "recommendedAction": "Scale out the Authentication service instances to distribute the load of RSA token verification and alleviate CPU contention. Investigate potential optimizations for crypto operations.",
+      "evidenceCount": 4,
+      "responseTimeMs": 5880.89,
+      "isCorrect": true
+    },
+    {
+      "id": "RCA-03",
+      "service": "Payments",
+      "metric": "p95_latency",
+      "groundTruthCause": "Redis cache connection timeout and cluster latency spike",
+      "predictedRootCause": "Redis cluster connectivity issues or performance degradation",
+      "confidence": 0.95,
+      "recommendedAction": "Investigate the health, connectivity, and performance of the redis-cluster.internal service.",
+      "evidenceCount": 3,
+      "responseTimeMs": 4445.16,
+      "isCorrect": true
+    },
+    {
+      "id": "RCA-04",
+      "service": "Orders",
+      "metric": "error_rate",
+      "groundTruthCause": "Recent deployment regression / Bad application release",
+      "predictedRootCause": "A software regression introduced by deployment v2.4.1, causing NullPointerExceptions in the order validation logic.",
+      "confidence": 0.95,
+      "recommendedAction": "Rollback to the previous stable deployment version to restore service availability. Investigate the NullPointerException in OrderValidator.validateDiscountCode(OrderValidator.java:84) in v2.4.1 before redeploying.",
+      "evidenceCount": 4,
+      "responseTimeMs": 5637.01,
+      "isCorrect": true
+    },
+    {
+      "id": "RCA-05",
+      "service": "Inventory",
+      "metric": "p95_latency",
+      "groundTruthCause": "High memory utilization / Garbage collection pressure",
+      "predictedRootCause": "JVM Major Garbage Collection pauses due to critically high OldGen memory utilization, directly causing elevated p95 latency.",
+      "confidence": 0.95,
+      "recommendedAction": "Increase JVM heap size (if resources allow) and thoroughly investigate application code for memory leaks or inefficient object usage contributing to high OldGen utilization. Tune JVM GC parameters for the specific workload.",
+      "evidenceCount": 5,
+      "responseTimeMs": 7797.69,
+      "isCorrect": true
+    },
+    {
+      "id": "RCA-06",
+      "service": "Checkout",
+      "metric": "p95_latency",
+      "groundTruthCause": "Thread pool / resource exhaustion",
+      "predictedRootCause": "Application thread pool exhaustion due to sustained high load or inefficient request processing.",
+      "confidence": 0.95,
+      "recommendedAction": "Immediately increase the application's thread pool capacity and/or scale out the Checkout service instances to handle the current request load. Concurrently, investigate if there's an unusual traffic surge or a recent degradation in individual request processing time that led to the saturation.",
+      "evidenceCount": 5,
+      "responseTimeMs": 8152.7,
+      "isCorrect": true
+    },
+    {
+      "id": "RCA-07",
+      "service": "Payments",
+      "metric": "error_rate",
+      "groundTruthCause": "Downstream third-party gateway dependency latency/failure",
+      "predictedRootCause": "Redis cache connection timeout and cluster latency spike",
+      "confidence": 0.91,
+      "recommendedAction": "Scale Redis replica instances and adjust client socket timeout to 2500ms",
+      "evidenceCount": 4,
+      "responseTimeMs": 316.08,
+      "isCorrect": true
+    },
+    {
+      "id": "RCA-08",
+      "service": "Orders",
+      "metric": "p95_latency",
+      "groundTruthCause": "Database performance degradation / Unindexed query",
+      "predictedRootCause": "Database connection pool exhaustion",
+      "confidence": 0.95,
+      "recommendedAction": "Increase database connection pool size from 20 to 40 and enable connection timeout alerts",
+      "evidenceCount": 5,
+      "responseTimeMs": 257.03,
+      "isCorrect": true
+    },
+    {
+      "id": "RCA-09",
+      "service": "Authentication",
+      "metric": "error_rate",
+      "groundTruthCause": "Deployment release regression / Key configuration mismatch",
+      "predictedRootCause": "Database connection pool exhaustion",
+      "confidence": 0.95,
+      "recommendedAction": "Increase database connection pool size from 20 to 40 and enable connection timeout alerts",
+      "evidenceCount": 5,
+      "responseTimeMs": 234.58,
+      "isCorrect": false
+    },
+    {
+      "id": "RCA-10",
+      "service": "Checkout",
+      "metric": "p95_latency",
+      "groundTruthCause": "Cascading microservice latency bottleneck",
+      "predictedRootCause": "Redis cache connection timeout and cluster latency spike",
+      "confidence": 0.91,
+      "recommendedAction": "Scale Redis replica instances and adjust client socket timeout to 2500ms",
+      "evidenceCount": 6,
+      "responseTimeMs": 242.21,
+      "isCorrect": true
+    }
+  ]
+}

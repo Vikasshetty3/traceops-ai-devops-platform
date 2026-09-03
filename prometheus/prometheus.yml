@@ -1,0 +1,23 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+rule_files:
+  - "rules/alerts.yml"
+
+scrape_configs:
+  - job_name: "traceops-backend"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["backend:5000", "host.docker.internal:5000", "localhost:5000"]
+        labels:
+          environment: "production"
+          cluster: "traceops-k8s"
+
+  - job_name: "traceops-services"
+    metrics_path: "/api/metrics/prometheus"
+    scrape_interval: 3s
+    static_configs:
+      - targets: ["backend:5000", "host.docker.internal:5000", "localhost:5000"]
+        labels:
+          tier: "microservices"

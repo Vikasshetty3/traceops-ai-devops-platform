@@ -1,0 +1,84 @@
+{
+  "requirements": [
+    {
+      "requirementId": "REQ-001",
+      "title": "Checkout latency SLA",
+      "description": "Checkout response latency p95 must stay under 2.0 seconds during peak traffic.",
+      "service": "Checkout",
+      "category": "performance",
+      "metric": "p95_latency",
+      "operator": "<",
+      "threshold": 2.0,
+      "unit": "seconds",
+      "priority": "CRITICAL",
+      "status": "ACTIVE"
+    },
+    {
+      "requirementId": "REQ-002",
+      "title": "Payment gateway success rate",
+      "description": "Payment transaction error rate must stay below 0.1% under normal conditions.",
+      "service": "Payments",
+      "category": "reliability",
+      "metric": "error_rate",
+      "operator": "<",
+      "threshold": 0.1,
+      "unit": "%",
+      "priority": "CRITICAL",
+      "status": "ACTIVE"
+    },
+    {
+      "requirementId": "REQ-003",
+      "title": "Order fulfillment processing latency",
+      "description": "Order ingestion and queue dispatch latency p95 must remain under 1.5 seconds.",
+      "service": "Orders",
+      "category": "performance",
+      "metric": "p95_latency",
+      "operator": "<",
+      "threshold": 1.5,
+      "unit": "seconds",
+      "priority": "HIGH",
+      "status": "ACTIVE"
+    },
+    {
+      "requirementId": "REQ-004",
+      "title": "User authentication response time",
+      "description": "JWT token issuance and validation p95 latency must be under 300ms.",
+      "service": "Authentication",
+      "category": "availability",
+      "metric": "p95_latency",
+      "operator": "<",
+      "threshold": 0.3,
+      "unit": "seconds",
+      "priority": "MEDIUM",
+      "status": "ACTIVE"
+    }
+  ],
+  "slos": [
+    {
+      "sloId": "SLO-001",
+      "requirementId": "REQ-001",
+      "service": "Checkout",
+      "metric": "p95_latency",
+      "operator": "<",
+      "threshold": 2.0,
+      "target": 2.0,
+      "unit": "seconds",
+      "window": "5m",
+      "severity": "CRITICAL",
+      "status": "ACTIVE"
+    },
+    {
+      "sloId": "SLO-002",
+      "requirementId": "REQ-002",
+      "service": "Payments",
+      "metric": "error_rate",
+      "operator": "<",
+      "threshold": 0.1,
+      "target": 0.1,
+      "unit": "%",
+      "window": "15m",
+      "severity": "CRITICAL",
+      "status": "ACTIVE"
+    }
+  ]
+}

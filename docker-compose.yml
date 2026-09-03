@@ -1,0 +1,89 @@
+version: "3.8"
+
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: traceops-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - traceops-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ml-service:
+    build:
+      context: ./ml-service
+      dockerfile: Dockerfile
+    container_name: traceops-ml-service
+    restart: unless-stopped
+    ports:
+      - "5001:5001"
+    environment:
+      - PORT=5001
+      - NODE_ENV=production
+    networks:
+      - traceops-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: traceops-backend
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - PORT=5000
+      - MONGODB_URI=mongodb://mongodb:27017/requirement_traceable_devops
+      - ML_SERVICE_URL=http://ml-service:5001
+      - DEVOPS_PROVIDER=simulation
+      - KUBERNETES_NAMESPACE=requirement-traceable-devops
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - JWT_SECRET=${JWT_SECRET:-traceops_production_secret_key_2026}
+      - NODE_ENV=production
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      ml-service:
+        condition: service_started
+    networks:
+      - traceops-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: traceops-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    networks:
+      - traceops-network
+
+  prometheus:
+    image: prom/prometheus:v2.50.1
+    container_name: traceops-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    networks:
+      - traceops-network
+
+volumes:
+  mongo_data:
+    driver: local
+
+networks:
+  traceops-network:
+    driver: bridge

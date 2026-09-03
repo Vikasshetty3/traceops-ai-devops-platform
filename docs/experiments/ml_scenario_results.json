@@ -1,0 +1,217 @@
+{
+  "totalScenarios": 8,
+  "accuracy": 0.875,
+  "falsePositives": 0,
+  "falseNegatives": 1,
+  "averagePredictionLatencyMs": 0.299,
+  "scenarios": [
+    {
+      "scenarioId": "SCEN-01",
+      "name": "Database Connection Pool Exhaustion",
+      "description": "Severe DB connection wait starvation under heavy traffic",
+      "telemetry": {
+        "cpuUsage": 92,
+        "memoryUsage": 64,
+        "errorRate": 2.4,
+        "latency": 2.85,
+        "requestRate": 1400,
+        "dbPoolUsage": 98,
+        "deploymentChanged": 0
+      },
+      "expectedState": "VIOLATION",
+      "predictedState": "VIOLATION",
+      "violationProbability": 0.96,
+      "confidence": 0.98,
+      "topRiskFactors": [
+        "p95Latency (+2.30)",
+        "cpuUsage (+1.48)",
+        "dbPoolUsage (+1.20)",
+        "requestRate (+0.46)",
+        "errorRate (+0.19)",
+        "memoryUsage (+0.17)"
+      ],
+      "predictionLatencyMs": 1.302,
+      "isCorrect": true
+    },
+    {
+      "scenarioId": "SCEN-02",
+      "name": "High CPU Saturation",
+      "description": "Cryptographic compute or infinite loop spike saturating CPU",
+      "telemetry": {
+        "cpuUsage": 96,
+        "memoryUsage": 55,
+        "errorRate": 1.1,
+        "latency": 2.1,
+        "requestRate": 950,
+        "dbPoolUsage": 60,
+        "deploymentChanged": 0
+      },
+      "expectedState": "VIOLATION",
+      "predictedState": "VIOLATION",
+      "violationProbability": 0.57,
+      "confidence": 0.89,
+      "topRiskFactors": [
+        "cpuUsage (+1.65)",
+        "p95Latency (+1.16)",
+        "requestRate (+0.20)",
+        "dbPoolUsage (+0.17)"
+      ],
+      "predictionLatencyMs": 0.319,
+      "isCorrect": true
+    },
+    {
+      "scenarioId": "SCEN-03",
+      "name": "Memory Leak & GC Pressure",
+      "description": "Heap exhaustion causing stop-the-world garbage collection pauses",
+      "telemetry": {
+        "cpuUsage": 78,
+        "memoryUsage": 95,
+        "errorRate": 1.8,
+        "latency": 2.3,
+        "requestRate": 600,
+        "dbPoolUsage": 50,
+        "deploymentChanged": 0
+      },
+      "expectedState": "VIOLATION",
+      "predictedState": "VIOLATION",
+      "violationProbability": 0.69,
+      "confidence": 0.92,
+      "topRiskFactors": [
+        "p95Latency (+1.46)",
+        "memoryUsage (+1.07)",
+        "cpuUsage (+0.91)",
+        "requestRate (+0.01)"
+      ],
+      "predictionLatencyMs": 0.107,
+      "isCorrect": true
+    },
+    {
+      "scenarioId": "SCEN-04",
+      "name": "Upstream Dependency High Latency",
+      "description": "Payment gateway downstream network slowdown",
+      "telemetry": {
+        "cpuUsage": 45,
+        "memoryUsage": 48,
+        "errorRate": 0.8,
+        "latency": 3.4,
+        "requestRate": 350,
+        "dbPoolUsage": 40,
+        "deploymentChanged": 0
+      },
+      "expectedState": "VIOLATION",
+      "predictedState": "NO_VIOLATION",
+      "violationProbability": 0.27,
+      "confidence": 0.92,
+      "topRiskFactors": [
+        "p95Latency (+3.14)"
+      ],
+      "predictionLatencyMs": 0.311,
+      "isCorrect": false
+    },
+    {
+      "scenarioId": "SCEN-05",
+      "name": "High Error Rate / 500 Storm",
+      "description": "Uncaught exception cascade yielding 12% 5xx responses",
+      "telemetry": {
+        "cpuUsage": 65,
+        "memoryUsage": 60,
+        "errorRate": 12.5,
+        "latency": 1.95,
+        "requestRate": 500,
+        "dbPoolUsage": 45,
+        "deploymentChanged": 0
+      },
+      "expectedState": "VIOLATION",
+      "predictedState": "VIOLATION",
+      "violationProbability": 0.88,
+      "confidence": 0.96,
+      "topRiskFactors": [
+        "errorRate (+3.48)",
+        "p95Latency (+0.93)",
+        "cpuUsage (+0.38)",
+        "memoryUsage (+0.05)"
+      ],
+      "predictionLatencyMs": 0.198,
+      "isCorrect": true
+    },
+    {
+      "scenarioId": "SCEN-06",
+      "name": "Bad Deployment Regression",
+      "description": "Newly rolled out build introduces memory bloat and latency regressions",
+      "telemetry": {
+        "cpuUsage": 82,
+        "memoryUsage": 88,
+        "errorRate": 4.5,
+        "latency": 2.6,
+        "requestRate": 700,
+        "dbPoolUsage": 80,
+        "deploymentChanged": 1
+      },
+      "expectedState": "VIOLATION",
+      "predictedState": "VIOLATION",
+      "violationProbability": 0.98,
+      "confidence": 0.99,
+      "topRiskFactors": [
+        "p95Latency (+1.92)",
+        "cpuUsage (+1.07)",
+        "errorRate (+0.87)",
+        "memoryUsage (+0.87)",
+        "dbPoolUsage (+0.71)",
+        "deploymentChanged (+0.71)",
+        "requestRate (+0.06)"
+      ],
+      "predictionLatencyMs": 0.078,
+      "isCorrect": true
+    },
+    {
+      "scenarioId": "SCEN-07",
+      "name": "Combined Resource Contention",
+      "description": "Simultaneous CPU, Memory, and DB starvation under Black Friday peak",
+      "telemetry": {
+        "cpuUsage": 98,
+        "memoryUsage": 92,
+        "errorRate": 8,
+        "latency": 4.2,
+        "requestRate": 2100,
+        "dbPoolUsage": 99,
+        "deploymentChanged": 1
+      },
+      "expectedState": "VIOLATION",
+      "predictedState": "VIOLATION",
+      "violationProbability": 1,
+      "confidence": 0.99,
+      "topRiskFactors": [
+        "p95Latency (+4.36)",
+        "errorRate (+2.01)",
+        "cpuUsage (+1.73)",
+        "dbPoolUsage (+1.23)",
+        "memoryUsage (+0.99)",
+        "requestRate (+0.85)",
+        "deploymentChanged (+0.71)"
+      ],
+      "predictionLatencyMs": 0.05,
+      "isCorrect": true
+    },
+    {
+      "scenarioId": "SCEN-08",
+      "name": "Healthy Nominal Baseline",
+      "description": "Normal production traffic within all SLA and SLO guardrails",
+      "telemetry": {
+        "cpuUsage": 35,
+        "memoryUsage": 42,
+        "errorRate": 0.02,
+        "latency": 0.22,
+        "requestRate": 320,
+        "dbPoolUsage": 30,
+        "deploymentChanged": 0
+      },
+      "expectedState": "NO_VIOLATION",
+      "predictedState": "NO_VIOLATION",
+      "violationProbability": 0,
+      "confidence": 0.98,
+      "topRiskFactors": [],
+      "predictionLatencyMs": 0.028,
+      "isCorrect": true
+    }
+  ]
+}

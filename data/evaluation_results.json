@@ -1,0 +1,47 @@
+{
+  "timestamp": "2026-09-03T05:02:23.162Z",
+  "model": "Logistic Regression (L2 Regularized)",
+  "datasetSize": 1500,
+  "trainSize": 1200,
+  "testSize": 300,
+  "metrics": {
+    "mlModel": {
+      "sampleCount": 300,
+      "accuracy": 0.9933,
+      "precision": 0.9808,
+      "recall": 1,
+      "f1Score": 0.9903,
+      "rocAuc": 0.9999,
+      "confusionMatrix": {
+        "truePositive": 102,
+        "falsePositive": 2,
+        "trueNegative": 196,
+        "falseNegative": 0
+      }
+    },
+    "ruleBasedBaseline": {
+      "sampleCount": 300,
+      "accuracy": 1,
+      "precision": 1,
+      "recall": 1,
+      "f1Score": 1,
+      "rocAuc": 0.88,
+      "confusionMatrix": {
+        "truePositive": 102,
+        "falsePositive": 0,
+        "trueNegative": 198,
+        "falseNegative": 0
+      }
+    }
+  },
+  "coefficients": {
+    "cpuUsage": 0.9177,
+    "memoryUsage": 0.5511,
+    "p95Latency": 1.7536,
+    "errorRate": 1.0169,
+    "requestRate": 0.2587,
+    "dbPoolUsage": 0.7531,
+    "deploymentChanged": 0.3739
+  },
+  "intercept": -2.3557
+}
