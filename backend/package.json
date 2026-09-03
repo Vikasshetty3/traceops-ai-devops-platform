@@ -2,11 +2,11 @@
   "name": "requirement-traceable-devops-backend",
   "version": "1.0.0",
   "description": "Backend for Requirement-Traceable Autonomous DevOps Copilot",
-  "main": "dist/server.js",
+  "main": "dist/backend/src/server.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "build": "tsc",
-    "start": "node dist/server.js"
+    "start": "node dist/backend/src/server.js"
   },
   "dependencies": {
     "@google/genai": "^2.20.0",

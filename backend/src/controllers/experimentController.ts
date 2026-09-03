@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { Experiment } from "../models/Experiment";
-import { ExperimentEngine } from "../../../experiment-engine";
+import { ExperimentEngine } from "../../../experiment-engine/experimentEngine";
 
 export const getExperiments = async (
   req: Request,

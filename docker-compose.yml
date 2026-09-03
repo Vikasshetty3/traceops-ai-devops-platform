@@ -1,6 +1,5 @@
-version: "3.8"
-
 services:
+
   mongodb:
     image: mongo:7.0
     container_name: traceops-mongodb
@@ -33,8 +32,8 @@ services:
 
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: traceops-backend
     restart: unless-stopped
     ports:

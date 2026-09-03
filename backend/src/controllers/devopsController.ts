@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { DevOpsAction } from "../models/DevOpsAction";
-import { DevOpsAdapter, SafetyGate } from "../../../devops-adapter";
+import { DevOpsAdapter } from "../../../devops-adapter/devopsAdapter";
+import { SafetyGate } from "../../../devops-adapter/safetyGate";
 
 export const getDevOpsActions = async (
   req: Request,
@@ -233,7 +234,7 @@ export const executeDevOpsAction = async (
       action.status = "EXECUTED";
       action.executedAt = execResult.executedAt;
     }
-    
+
     action.executionLogs.push(...execResult.logs);
     await action.save();
 

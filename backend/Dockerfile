@@ -2,22 +2,38 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-COPY package*.json ./
+# Copy backend package manifests for dependency installation
+COPY backend/package*.json ./backend/
+
+# Install backend dependencies
+WORKDIR /app/backend
 RUN npm ci
 
-COPY . .
+# Copy full source trees required for TypeScript compilation
+WORKDIR /app
+COPY backend ./backend
+COPY devops-adapter ./devops-adapter
+COPY experiment-engine ./experiment-engine
+COPY ml-service/src/model.ts ./ml-service/src/model.ts
+
+# Build backend
+WORKDIR /app/backend
 RUN npm run build
+
 
 FROM node:20-alpine AS runner
 
-WORKDIR /app
+WORKDIR /app/backend
 
-COPY package*.json ./
-RUN npm ci --only=production
+# Copy backend package manifests
+COPY backend/package*.json ./
 
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
+# Install production dependencies
+RUN npm ci --omit=dev
+
+# Copy compiled JavaScript output
+COPY --from=builder /app/backend/dist ./dist
 
 EXPOSE 5000
 
-CMD ["node", "dist/server.js"]
+CMD ["node", "dist/backend/src/server.js"]

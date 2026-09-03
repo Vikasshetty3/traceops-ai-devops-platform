@@ -13,6 +13,8 @@ export const predictViolation = async (
       memoryUsage,
       errorRate,
       latency,
+      requestRate,
+      dbPoolUsage,
       deploymentChanged,
     } = req.body;
 
@@ -37,6 +39,10 @@ export const predictViolation = async (
       memoryUsage: Number(memoryUsage),
       errorRate: Number(errorRate),
       latency: Number(latency),
+      requestRate:
+        requestRate !== undefined ? Number(requestRate) : undefined,
+      dbPoolUsage:
+        dbPoolUsage !== undefined ? Number(dbPoolUsage) : undefined,
       deploymentChanged: deploymentChanged ? 1 : 0,
     });
 

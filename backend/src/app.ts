@@ -56,6 +56,31 @@ app.use("/api/metrics", metricsRoutes);
 // Prometheus scraper endpoint
 app.get("/metrics", getPrometheusMetrics);
 
+// Root endpoint
+app.get("/", (_req, res) => {
+  res.status(200).json({
+    name: "Requirement-Traceable Autonomous DevOps Platform API",
+    version: "1.0.0",
+    status: "ONLINE",
+    message: "TraceOps backend API is operational.",
+    endpoints: {
+      health: "/api/health",
+      metrics: "/metrics",
+      requirements: "/api/requirements",
+      slos: "/api/slos",
+      traceability: "/api/traceability",
+      sloEvaluation: "/api/slo-evaluation",
+      incidents: "/api/incidents",
+      rca: "/api/rca",
+      geminiRca: "/api/gemini-rca/analyze",
+      mlPredict: "/api/ml/predict",
+      experiments: "/api/experiments",
+      devops: "/api/devops",
+    },
+    frontend: "http://localhost:5173",
+  });
+});
+
 app.get("/api/health", (_req, res) => {
   res.status(200).json({
     success: true,

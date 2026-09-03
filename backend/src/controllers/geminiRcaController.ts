@@ -29,7 +29,7 @@ export const analyzeGeminiRCA = async (
       return;
     }
 
-    // Send incident evidence to Gemini
+    // Send incident evidence to Gemini or intelligent SRE fallback
     const result = await analyzeWithGemini(input);
 
     const rcaId = `RCA-GEMINI-${Date.now().toString().slice(-6)}`;
@@ -67,13 +67,7 @@ export const analyzeGeminiRCA = async (
     res.status(201).json({
       success: true,
       message: "Gemini RCA generated and saved successfully",
-      data: {
-        ...result,
-        requirementId: input.requirementId,
-        service: input.service,
-        rcaId: rca.rcaId,
-        savedToDatabase: true,
-      },
+      data: rca,
     });
   } catch (error) {
     console.error("Gemini RCA error:", error);

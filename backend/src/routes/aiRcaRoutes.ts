@@ -3,6 +3,7 @@ import { analyzeRCA } from "../controllers/aiRcaController";
 
 const router = express.Router();
 
+router.post("/analyze", analyzeRCA);
 router.post("/", analyzeRCA);
 
 export default router;

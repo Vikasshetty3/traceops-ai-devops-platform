@@ -9,7 +9,7 @@ import {
 
 const router = Router();
 
-router.route("/").get(getDevOpsActions);
+router.route("/").get(getDevOpsActions).post(proposeDevOpsAction);
 router.route("/propose").post(proposeDevOpsAction);
 router.route("/approve/:id").post(approveDevOpsAction);
 router.route("/reject/:id").post(rejectDevOpsAction);

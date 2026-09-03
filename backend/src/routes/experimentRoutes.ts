@@ -7,7 +7,7 @@ import {
 
 const router = Router();
 
-router.route("/").get(getExperiments);
+router.route("/").get(getExperiments).post(runExperiment);
 router.route("/run").post(runExperiment);
 router.route("/:id").get(getExperimentById);
 
