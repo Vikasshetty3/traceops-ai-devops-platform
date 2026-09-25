@@ -205,17 +205,26 @@ export class ProjectStorageService {
   /**
    * Zip-slip protected archive extractor
    */
-  public static extractZipSafely(zipBuffer: Buffer, targetDir: string): void {
-    const zip = new AdmZip(zipBuffer);
+  public static extractZipSafely(zipInput: Buffer | string, targetDir: string): void {
+    const zip = typeof zipInput === "string" ? new AdmZip(zipInput) : new AdmZip(zipInput);
     const entries = zip.getEntries();
     const resolvedTarget = path.resolve(targetDir);
 
     for (const entry of entries) {
-      const cleanName = entry.entryName.replace(/^(\.\.[\/\\])+/, "");
+      const rawName = entry.entryName;
+      // Reject any malicious zip traversal entry
+      if (
+        rawName.includes("..") &&
+        (rawName.includes("../") || rawName.includes("..\\") || rawName.startsWith(".."))
+      ) {
+        throw new Error(`Security Violation: Zip-Slip detected! Path traversal attempt blocked: ${entry.entryName}`);
+      }
+
+      const cleanName = rawName.replace(/^(\.\.[\/\\])+/, "");
       const fullPath = path.resolve(resolvedTarget, cleanName);
 
-      if (!fullPath.startsWith(resolvedTarget)) {
-        throw new Error(`Security Violation: Zip entry attempts path traversal: ${entry.entryName}`);
+      if (!fullPath.startsWith(resolvedTarget + path.sep) && fullPath !== resolvedTarget) {
+        throw new Error(`Security Violation: Zip-Slip detected! Path traversal attempt blocked: ${entry.entryName}`);
       }
 
       if (entry.isDirectory) {
@@ -225,6 +234,71 @@ export class ProjectStorageService {
         fs.writeFileSync(fullPath, entry.getData());
       }
     }
+  }
+
+  /**
+   * Packages the isolated repair workspace into a final downloadable ZIP archive.
+   * Includes all repaired source files + repair-report.json.
+   * Excludes node_modules, .git, temporary files, etc.
+   * Guarantees the original project source remains 100% immutable.
+   */
+  public static packageRepairedProjectZip(
+    repairId: string,
+    reportData: Record<string, unknown>
+  ): { zipBuffer: Buffer; fileName: string; report: Record<string, unknown> } {
+    const workspaceDir = this.getWorkspaceDir(repairId);
+    if (!fs.existsSync(workspaceDir)) {
+      throw new Error(`Repaired workspace not found for repairId: ${repairId}`);
+    }
+
+    const zip = new AdmZip();
+    const excluded = new Set([
+      "node_modules",
+      ".git",
+      ".DS_Store",
+      "Thumbs.db",
+      ".env",
+      "package-lock.json.tmp",
+    ]);
+
+    // Recursively add workspace files
+    const addDirEntries = (currentDir: string, zipPrefix: string = "") => {
+      const entries = fs.readdirSync(currentDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (excluded.has(entry.name)) continue;
+        if (entry.name.endsWith(".log") || entry.name.endsWith(".tmp")) continue;
+
+        const fullPath = path.join(currentDir, entry.name);
+        const relativeEntryPath = zipPrefix ? `${zipPrefix}/${entry.name}` : entry.name;
+
+        if (entry.isDirectory()) {
+          addDirEntries(fullPath, relativeEntryPath);
+        } else if (entry.isFile()) {
+          zip.addFile(relativeEntryPath, fs.readFileSync(fullPath));
+        }
+      }
+    };
+
+    addDirEntries(workspaceDir);
+
+    // Embed the repair-report.json at the root of the repaired archive
+    const finalReport = {
+      ...reportData,
+      packagedAt: new Date().toISOString(),
+    };
+    zip.addFile(
+      "repair-report.json",
+      Buffer.from(JSON.stringify(finalReport, null, 2), "utf-8")
+    );
+
+    const zipBuffer = zip.toBuffer();
+    const projSlug = String(reportData.projectName || "project")
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]/g, "-")
+      .replace(/-+/g, "-");
+    const fileName = `${projSlug}-repaired-${repairId}.zip`;
+
+    return { zipBuffer, fileName, report: finalReport };
   }
 
   private static copyDirectoryRecursive(src: string, dest: string, exclude: string[] = []): void {

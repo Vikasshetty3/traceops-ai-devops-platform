@@ -85,7 +85,7 @@ export const SLOsTab: React.FC<SLOsTabProps> = ({
 
       {slos.length === 0 ? (
         <EmptyState
-          title="No Active SLOs"
+          title="No SLOs defined"
           description="Register technical SLO targets mapped to business requirements."
           action={
             <button
@@ -142,12 +142,12 @@ export const SLOsTab: React.FC<SLOsTabProps> = ({
                   </td>
                   <td style={{ padding: "14px 16px", color: "#f8fafc", fontWeight: 600 }}>{slo.service}</td>
                   <td style={{ padding: "14px 16px", fontFamily: "monospace", color: "#f1f5f9" }}>
-                    {slo.metric} {slo.operator || "<"} {slo.threshold} {slo.unit}
+                    {slo.metric} {slo.operator || ""} {slo.threshold != null ? slo.threshold : ""} {slo.unit || ""}
                   </td>
                   <td style={{ padding: "14px 16px", color: "#10b981", fontWeight: 600 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
                       <Target className="w-3.5 h-3.5" />
-                      {slo.target || 99.9}% ({slo.window || "5m"})
+                      {slo.target != null ? `${slo.target}%` : "No target defined"} {slo.window ? `(${slo.window})` : ""}
                     </div>
                   </td>
                   <td style={{ padding: "14px 16px" }}>

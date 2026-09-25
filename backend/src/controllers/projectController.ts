@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import fs from "fs";
 import path from "path";
 import os from "os";
+import mongoose from "mongoose";
 import { Project } from "../models/Project";
 import { Requirement } from "../models/Requirement";
 import { SLO } from "../models/SLO";
@@ -193,16 +194,27 @@ export const onboardGithubProject = async (req: Request, res: Response): Promise
     res.status(200).json({
       success: true,
       message: "GitHub repository successfully acquired, analyzed, and integrated",
+      project: savedProject,
+      analysis: analysisResult,
       data: {
         project: savedProject,
         analysis: analysisResult,
       },
     });
   } catch (error) {
-    res.status(500).json({
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    const isClientError =
+      errorMsg.includes("Invalid GitHub") ||
+      errorMsg.includes("Security Violation") ||
+      errorMsg.includes("malformed") ||
+      errorMsg.includes("not found") ||
+      errorMsg.includes("Illegal characters") ||
+      errorMsg.includes("does not exist");
+
+    res.status(isClientError ? 400 : 500).json({
       success: false,
-      message: "Failed to onboard GitHub repository",
-      error: error instanceof Error ? error.message : String(error),
+      message: isClientError ? errorMsg : "Failed to onboard GitHub repository",
+      error: errorMsg,
     });
   }
 };
@@ -280,25 +292,33 @@ export const getProjects = async (_req: Request, res: Response): Promise<void> =
 export const getProjectById = async (req: Request, res: Response): Promise<void> => {
   try {
     const { projectId } = req.params;
-    const project = await Project.findOne({ projectId });
+    const query = mongoose.isValidObjectId(projectId)
+      ? { $or: [{ projectId }, { _id: projectId }] }
+      : { projectId };
+    const project = await Project.findOne(query);
 
     if (!project) {
       res.status(404).json({ success: false, message: "Project not found" });
       return;
     }
 
+    const actualProjectId = project.projectId;
     const requirements = await Requirement.find({
-      $or: [{ projectId }, { requirementId: { $in: project.extractedRequirements } }],
+      $or: [{ projectId: actualProjectId }, { requirementId: { $in: project.extractedRequirements } }],
     });
 
     const slos = await SLO.find({
-      $or: [{ projectId }, { sloId: { $in: project.generatedSLOs } }],
+      $or: [{ projectId: actualProjectId }, { sloId: { $in: project.generatedSLOs } }],
     });
 
-    const traces = await Traceability.find({ projectId });
+    const traces = await Traceability.find({ projectId: actualProjectId });
 
     res.status(200).json({
       success: true,
+      project,
+      requirements,
+      slos,
+      traceability: traces,
       data: {
         project,
         requirements,
@@ -321,24 +341,122 @@ export const getProjectById = async (req: Request, res: Response): Promise<void>
 export const getProjectTraceability = async (req: Request, res: Response): Promise<void> => {
   try {
     const { projectId } = req.params;
-    const traces = await Traceability.find({ projectId });
-    const reqs = await Requirement.find({ projectId });
-    const slos = await SLO.find({ projectId });
+    const query = mongoose.isValidObjectId(projectId)
+      ? { $or: [{ projectId }, { _id: projectId }] }
+      : { projectId };
+    const project = await Project.findOne(query);
+    const actualProjectId = project ? project.projectId : projectId;
+
+    const traces = await Traceability.find({ projectId: actualProjectId });
+    const reqs = await Requirement.find({ projectId: actualProjectId });
+    const slos = await SLO.find({ projectId: actualProjectId });
+
+    // Build structured graph
+    const nodes = [
+      ...(project ? [{ id: project.projectId, type: "PROJECT", label: project.name }] : []),
+      ...reqs.map((r) => ({ id: r.requirementId, type: "REQUIREMENT", label: r.title })),
+      ...slos.map((s) => ({ id: s.sloId, type: "SLO", label: `${s.service}: ${s.metric}` })),
+      ...traces.map((t) => ({ id: t.traceId, type: "TRACE", label: `${t.service} (${t.metric})` })),
+    ];
+
+    const edges = traces.map((t) => ({
+      source: t.requirementId || actualProjectId,
+      target: t.sloId || t.traceId,
+      relation: "VALIDATES",
+    }));
 
     res.status(200).json({
       success: true,
+      graph: {
+        nodes,
+        edges,
+      },
       data: {
-        projectId,
+        projectId: actualProjectId,
         traceCount: traces.length,
         nodes: traces,
         requirements: reqs,
         slos: slos,
+        graph: {
+          nodes,
+          edges,
+        },
       },
     });
   } catch (error) {
     res.status(500).json({
       success: false,
       message: "Failed to retrieve project traceability",
+      error: error instanceof Error ? error.message : error,
+    });
+  }
+};
+
+/**
+ * Get requirements belonging to a specific project
+ */
+export const getProjectRequirements = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { projectId } = req.params;
+    const query = mongoose.isValidObjectId(projectId)
+      ? { $or: [{ projectId }, { _id: projectId }] }
+      : { projectId };
+    const project = await Project.findOne(query);
+    if (!project) {
+      res.status(404).json({ success: false, message: `Project not found: ${projectId}` });
+      return;
+    }
+
+    const actualProjectId = project.projectId;
+    const requirements = await Requirement.find({
+      $or: [{ projectId: actualProjectId }, { requirementId: { $in: project.extractedRequirements } }],
+    });
+
+    res.status(200).json({
+      success: true,
+      count: requirements.length,
+      requirements,
+      data: requirements,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch project requirements",
+      error: error instanceof Error ? error.message : error,
+    });
+  }
+};
+
+/**
+ * Get SLOs belonging to a specific project
+ */
+export const getProjectSLOs = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { projectId } = req.params;
+    const query = mongoose.isValidObjectId(projectId)
+      ? { $or: [{ projectId }, { _id: projectId }] }
+      : { projectId };
+    const project = await Project.findOne(query);
+    if (!project) {
+      res.status(404).json({ success: false, message: `Project not found: ${projectId}` });
+      return;
+    }
+
+    const actualProjectId = project.projectId;
+    const slos = await SLO.find({
+      $or: [{ projectId: actualProjectId }, { sloId: { $in: project.generatedSLOs } }],
+    });
+
+    res.status(200).json({
+      success: true,
+      count: slos.length,
+      slos,
+      data: slos,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch project SLOs",
       error: error instanceof Error ? error.message : error,
     });
   }

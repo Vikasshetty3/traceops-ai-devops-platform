@@ -52,6 +52,8 @@ services:
         condition: service_healthy
       ml-service:
         condition: service_started
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - traceops-network
 

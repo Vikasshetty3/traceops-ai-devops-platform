@@ -53,8 +53,8 @@ export class MLClient {
     });
 
     return {
-      requirementId: payload.requirementId || "REQ-001",
-      service: payload.service || "Checkout",
+      requirementId: payload.requirementId,
+      service: payload.service,
       ...fallbackPrediction,
     };
   }

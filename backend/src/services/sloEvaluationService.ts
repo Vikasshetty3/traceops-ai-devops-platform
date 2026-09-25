@@ -91,8 +91,11 @@ export class SLOEvaluationService {
 
     for (const slo of slos) {
       const metricKey = `${slo.service}_${slo.metric}`;
-      const actualValue = metricsMap[metricKey] ?? metricsMap[slo.metric] ?? 0;
-      evaluations.push(this.evaluateSLODirect(slo, actualValue));
+      const val = metricsMap[metricKey] !== undefined ? metricsMap[metricKey] : metricsMap[slo.metric];
+      if (val === undefined) {
+        continue;
+      }
+      evaluations.push(this.evaluateSLODirect(slo, Number(val)));
     }
 
     const total = evaluations.length;

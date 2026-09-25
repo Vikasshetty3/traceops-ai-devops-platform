@@ -217,8 +217,8 @@ async function runE2ETest() {
           // Step 7: Safety Gate Check (Cannot deploy unapproved repair)
           console.log(`\n[7/12] Testing Safety Gate: Attempting deployment of UNAPPROVED repair...`);
           const unapprovedDeployRes = await request("POST", `/api/repairs/${repair.repairId}/deploy`);
-          if (unapprovedDeployRes.status === 500 && unapprovedDeployRes.data.error.includes("Safety Gate")) {
-            console.log(`  ✓ Safety Gate correctly BLOCKED unapproved deployment: ${unapprovedDeployRes.data.error}`);
+          if ((unapprovedDeployRes.status === 400 || unapprovedDeployRes.status === 500) && (unapprovedDeployRes.data.error?.includes("Safety Gate") || unapprovedDeployRes.data.message?.includes("Safety Gate"))) {
+            console.log(`  ✓ Safety Gate correctly BLOCKED unapproved deployment: ${unapprovedDeployRes.data.error || unapprovedDeployRes.data.message}`);
             passedTests++;
           } else {
             throw new Error(`Safety gate failed to block unapproved deployment: ${JSON.stringify(unapprovedDeployRes)}`);

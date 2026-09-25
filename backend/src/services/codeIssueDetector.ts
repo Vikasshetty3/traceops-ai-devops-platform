@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { CodeIssue, ICodeIssue } from "../models/CodeIssue";
+import { ProjectRuntimeInspector } from "./projectRuntimeInspector";
 
 export interface DetectedIssueDraft {
   service: string;
@@ -55,27 +56,33 @@ export class CodeIssueDetector {
     const persistedIssues: ICodeIssue[] = [];
     let issueCounter = 1;
 
-    // Remove older open issues for this project to refresh
-    await CodeIssue.deleteMany({ projectId, status: "OPEN" });
+    // Remove older issues for this project to refresh cleanly
+    await CodeIssue.deleteMany({ projectId });
 
     for (const draft of rawIssues) {
       const issueId = `ISSUE-${projectId.replace("PROJ-", "")}-${String(issueCounter++).padStart(3, "0")}`;
-      const issue = await CodeIssue.create({
-        issueId,
-        projectId,
-        service: draft.service,
-        severity: draft.severity,
-        category: draft.category,
-        file: draft.file,
-        line: draft.line,
-        evidence: draft.evidence,
-        description: draft.description,
-        rootCause: draft.rootCause,
-        confidence: draft.confidence,
-        suggestedFix: draft.suggestedFix,
-        sloImpact: draft.sloImpact || "",
-        status: "OPEN",
-      });
+      const issue = await CodeIssue.findOneAndUpdate(
+        { issueId },
+        {
+          $set: {
+            issueId,
+            projectId,
+            service: draft.service,
+            severity: draft.severity,
+            category: draft.category,
+            file: draft.file,
+            line: draft.line,
+            evidence: draft.evidence,
+            description: draft.description,
+            rootCause: draft.rootCause,
+            confidence: draft.confidence,
+            suggestedFix: draft.suggestedFix,
+            sloImpact: draft.sloImpact || "",
+            status: "OPEN",
+          },
+        },
+        { upsert: true, new: true }
+      );
       persistedIssues.push(issue);
     }
 
@@ -375,6 +382,11 @@ export class CodeIssueDetector {
     if (fs.existsSync(dockerfilePath)) {
       const content = fs.readFileSync(dockerfilePath, "utf-8");
       if (!content.includes("HEALTHCHECK") && !content.includes("EXPOSE")) {
+        const runtime = ProjectRuntimeInspector.inspect(sourceDir);
+        const suggestedFix = runtime.recommendedHealthcheckInstruction
+          ? `Add EXPOSE ${runtime.port} and ${runtime.recommendedHealthcheckInstruction}`
+          : `Add EXPOSE ${runtime.port} (No verified application health endpoint available)`;
+
         issues.push({
           service: "docker",
           severity: "LOW",
@@ -382,10 +394,10 @@ export class CodeIssueDetector {
           file: "Dockerfile",
           line: 1,
           evidence: "Missing EXPOSE or HEALTHCHECK directive",
-          description: "Dockerfile does not declare EXPOSE port or HEALTHCHECK instruction.",
+          description: `Dockerfile does not declare EXPOSE port (${runtime.port}) or HEALTHCHECK instruction.`,
           rootCause: "Without EXPOSE or HEALTHCHECK, orchestrators cannot infer default container ports.",
           confidence: 0.85,
-          suggestedFix: "Add EXPOSE 5000 and HEALTHCHECK --interval=30s CMD curl -f http://localhost:5000/health || exit 1",
+          suggestedFix,
         });
       }
     }

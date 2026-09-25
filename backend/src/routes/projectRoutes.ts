@@ -8,8 +8,14 @@ import {
   getProjects,
   getProjectById,
   getProjectTraceability,
+  getProjectRequirements,
+  getProjectSLOs,
   deleteProject,
 } from "../controllers/projectController";
+import {
+  downloadRepairedProject,
+  downloadLatestRepairedProject,
+} from "../controllers/repairController";
 
 const router = Router();
 
@@ -32,10 +38,14 @@ router.post("/:projectId/analyze", upload.any(), uploadAndAnalyzeProject);
 router.post("/github", onboardGithubProject);
 router.get("/:projectId/github-updates", checkGithubUpdates);
 
-// Project details & Traceability
+// Project details, Requirements, SLOs & Traceability
 router.get("/:projectId", getProjectById);
 router.get("/:projectId/analysis", getProjectById);
+router.get("/:projectId/requirements", getProjectRequirements);
+router.get("/:projectId/slos", getProjectSLOs);
 router.get("/:projectId/traceability", getProjectTraceability);
+router.get("/:projectId/download-repaired", downloadLatestRepairedProject);
+router.get("/:projectId/repairs/:repairId/download", downloadRepairedProject);
 router.delete("/:projectId", deleteProject);
 
 export default router;

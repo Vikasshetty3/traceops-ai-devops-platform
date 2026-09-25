@@ -240,6 +240,72 @@ export const api = {
   getRepairHistory: (projectId: string) =>
     fetchJson<RepairHistory>(`${API_BASE}/projects/${projectId}/repair-history`),
 
+  downloadRepairedProjectZip: async (repairId: string, projectId?: string): Promise<{ success: boolean; fileName: string }> => {
+    const url = projectId
+      ? `${API_BASE}/projects/${projectId}/repairs/${repairId}/download`
+      : `${API_BASE}/repairs/${repairId}/download`;
+
+    const res = await fetch(url);
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      throw new Error(errBody.message || `Download failed with HTTP ${res.status}`);
+    }
+
+    const disposition = res.headers.get("Content-Disposition");
+    let fileName = `repaired-project-${repairId}.zip`;
+    if (disposition && disposition.includes("filename=")) {
+      const match = disposition.match(/filename="?([^"]+)"?/);
+      if (match && match[1]) fileName = match[1];
+    }
+
+    const blob = await res.blob();
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = downloadUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(downloadUrl);
+
+    return { success: true, fileName };
+  },
+
+  downloadLatestRepairedProjectZip: async (projectId: string): Promise<{ success: boolean; fileName: string }> => {
+    const url = `${API_BASE}/projects/${projectId}/download-repaired`;
+
+    const res = await fetch(url);
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      throw new Error(errBody.message || `Download failed with HTTP ${res.status}`);
+    }
+
+    const disposition = res.headers.get("Content-Disposition");
+    let fileName = `repaired-project-${projectId}.zip`;
+    if (disposition && disposition.includes("filename=")) {
+      const match = disposition.match(/filename="?([^"]+)"?/);
+      if (match && match[1]) fileName = match[1];
+    }
+
+    const blob = await res.blob();
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = downloadUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(downloadUrl);
+
+    return { success: true, fileName };
+  },
+
+  getProjectRequirements: (projectId: string) =>
+    fetchJson<Requirement[]>(`${API_BASE}/projects/${projectId}/requirements`),
+
+  getProjectSLOs: (projectId: string) =>
+    fetchJson<SLO[]>(`${API_BASE}/projects/${projectId}/slos`),
+
   // Telemetry & Metrics
   getTelemetry: () => fetchJson<ServiceTelemetry[]>(`${API_BASE}/metrics`),
   triggerSpike: (service = "Checkout") =>

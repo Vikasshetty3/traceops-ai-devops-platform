@@ -51,14 +51,16 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
   const openIncidents = incidents.filter((i) => i.status !== "RESOLVED");
   const executedActions = devopsActions.filter((a) => a.status === "EXECUTED");
 
-  // Chart data formatting from live telemetry
-  const chartData = telemetry.map((t) => ({
-    name: t.service,
-    latency: Number((t.p95Latency * 1000).toFixed(0)),
-    cpu: t.cpuUsage,
-    memory: t.memoryUsage,
-    errors: Number((t.errorRate * 10).toFixed(1)),
-  }));
+  // Chart data formatting from live telemetry: only services with actual measurements
+  const chartData = telemetry
+    .filter((t) => t.p95Latency != null || t.cpuUsage != null)
+    .map((t) => ({
+      name: t.service,
+      latency: t.p95Latency != null ? Number((t.p95Latency * 1000).toFixed(0)) : null,
+      cpu: t.cpuUsage != null ? t.cpuUsage : null,
+      memory: t.memoryUsage != null ? t.memoryUsage : null,
+      errors: t.errorRate != null ? Number((t.errorRate * 10).toFixed(1)) : null,
+    }));
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
@@ -67,14 +69,14 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
         <MetricCard
           title="Total Requirements"
           value={requirements.length}
-          subtitle="Governed under SLA"
+          subtitle={requirements.length > 0 ? `${requirements.length} requirements defined` : "No requirements discovered"}
           icon={<Layers className="w-5 h-5" />}
           color="indigo"
         />
         <MetricCard
           title="Active SLO Targets"
           value={slos.length}
-          subtitle={`${slos.filter((s) => s.status === "ACTIVE").length} actively monitored`}
+          subtitle={slos.length > 0 ? `${slos.filter((s) => s.status === "ACTIVE").length} actively monitored` : "No SLOs defined"}
           icon={<Zap className="w-5 h-5" />}
           color="blue"
         />
@@ -147,60 +149,76 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
           }
         />
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px" }}>
-          {telemetry.map((svc) => (
-            <div
-              key={svc.service}
-              style={{
-                borderRadius: "8px",
-                padding: "16px 18px",
-                background: "rgba(15, 23, 42, 0.65)",
-                border: `1px solid ${
-                  svc.status === "CRITICAL"
-                    ? "rgba(239, 68, 68, 0.5)"
-                    : svc.status === "DEGRADED"
-                    ? "rgba(245, 158, 11, 0.5)"
-                    : "rgba(148, 163, 184, 0.2)"
-                }`,
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <Server className="w-4 h-4" style={{ color: "#38bdf8" }} />
-                  <span style={{ fontWeight: 700, fontSize: "16px", color: "#f8fafc" }}>{svc.service}</span>
+        {telemetry.length === 0 ? (
+          <div
+            style={{
+              padding: "36px",
+              textAlign: "center",
+              color: "#94a3b8",
+              backgroundColor: "rgba(15, 23, 42, 0.4)",
+              borderRadius: "8px",
+              border: "1px dashed rgba(148, 163, 184, 0.2)",
+              fontSize: "14px",
+            }}
+          >
+            No telemetry data available
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px" }}>
+            {telemetry.map((svc) => (
+              <div
+                key={svc.service}
+                style={{
+                  borderRadius: "8px",
+                  padding: "16px 18px",
+                  background: "rgba(15, 23, 42, 0.65)",
+                  border: `1px solid ${
+                    svc.status === "CRITICAL"
+                      ? "rgba(239, 68, 68, 0.5)"
+                      : svc.status === "DEGRADED"
+                      ? "rgba(245, 158, 11, 0.5)"
+                      : "rgba(148, 163, 184, 0.2)"
+                  }`,
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <Server className="w-4 h-4" style={{ color: "#38bdf8" }} />
+                    <span style={{ fontWeight: 700, fontSize: "16px", color: "#f8fafc" }}>{svc.service}</span>
+                  </div>
+                  <StatusBadge status={svc.status} size="sm" />
                 </div>
-                <StatusBadge status={svc.status} size="sm" />
-              </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", fontSize: "13px" }}>
-                <div>
-                  <div style={{ color: "#94a3b8" }}>p95 Latency</div>
-                  <div style={{ fontSize: "17px", fontWeight: 700, color: svc.p95Latency > 2.0 ? "#ef4444" : "#f1f5f9" }}>
-                    {(svc.p95Latency * 1000).toFixed(0)} ms
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", fontSize: "13px" }}>
+                  <div>
+                    <div style={{ color: "#94a3b8" }}>p95 Latency</div>
+                    <div style={{ fontSize: "17px", fontWeight: 700, color: svc.p95Latency != null && svc.p95Latency > 2.0 ? "#ef4444" : "#f1f5f9" }}>
+                      {svc.p95Latency != null ? `${(svc.p95Latency * 1000).toFixed(0)} ms` : "No measurement available"}
+                    </div>
                   </div>
-                </div>
-                <div>
-                  <div style={{ color: "#94a3b8" }}>CPU Utilization</div>
-                  <div style={{ fontSize: "17px", fontWeight: 700, color: svc.cpuUsage > 85 ? "#ef4444" : "#f1f5f9" }}>
-                    {svc.cpuUsage}%
+                  <div>
+                    <div style={{ color: "#94a3b8" }}>CPU Utilization</div>
+                    <div style={{ fontSize: "17px", fontWeight: 700, color: svc.cpuUsage != null && svc.cpuUsage > 85 ? "#ef4444" : "#f1f5f9" }}>
+                      {svc.cpuUsage != null ? `${svc.cpuUsage}%` : "No measurement available"}
+                    </div>
                   </div>
-                </div>
-                <div>
-                  <div style={{ color: "#94a3b8" }}>Memory Usage</div>
-                  <div style={{ fontSize: "17px", fontWeight: 700, color: svc.memoryUsage > 85 ? "#ef4444" : "#f1f5f9" }}>
-                    {svc.memoryUsage}%
+                  <div>
+                    <div style={{ color: "#94a3b8" }}>Memory Usage</div>
+                    <div style={{ fontSize: "17px", fontWeight: 700, color: svc.memoryUsage != null && svc.memoryUsage > 85 ? "#ef4444" : "#f1f5f9" }}>
+                      {svc.memoryUsage != null ? `${svc.memoryUsage}%` : "No measurement available"}
+                    </div>
                   </div>
-                </div>
-                <div>
-                  <div style={{ color: "#94a3b8" }}>Error Rate</div>
-                  <div style={{ fontSize: "17px", fontWeight: 700, color: svc.errorRate > 1.0 ? "#ef4444" : "#10b981" }}>
-                    {svc.errorRate}%
+                  <div>
+                    <div style={{ color: "#94a3b8" }}>Error Rate</div>
+                    <div style={{ fontSize: "17px", fontWeight: 700, color: svc.errorRate != null && svc.errorRate > 1.0 ? "#ef4444" : "#10b981" }}>
+                      {svc.errorRate != null ? `${svc.errorRate}%` : "No measurement available"}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* 3. Performance Chart Comparison */}
@@ -222,33 +240,49 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
         </div>
 
         <div style={{ height: "240px", width: "100%" }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <defs>
-                <linearGradient id="latencyGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#38bdf8" stopOpacity={0.4} />
-                  <stop offset="95%" stopColor="#38bdf8" stopOpacity={0.0} />
-                </linearGradient>
-                <linearGradient id="cpuGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#ef4444" stopOpacity={0.4} />
-                  <stop offset="95%" stopColor="#ef4444" stopOpacity={0.0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.15)" />
-              <XAxis dataKey="name" stroke="#64748b" fontSize={12} />
-              <YAxis stroke="#64748b" fontSize={12} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "#0f172a",
-                  borderColor: "rgba(148, 163, 184, 0.3)",
-                  borderRadius: "8px",
-                  fontSize: "13px",
-                }}
-              />
-              <Area type="monotone" dataKey="latency" name="p95 Latency (ms)" stroke="#38bdf8" fill="url(#latencyGradient)" />
-              <Area type="monotone" dataKey="cpu" name="CPU Usage (%)" stroke="#ef4444" fill="url(#cpuGradient)" />
-            </AreaChart>
-          </ResponsiveContainer>
+          {chartData.length === 0 ? (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                height: "100%",
+                color: "#94a3b8",
+                fontSize: "14px",
+                fontStyle: "italic",
+              }}
+            >
+              No telemetry data available
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="latencyGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#38bdf8" stopOpacity={0.4} />
+                    <stop offset="95%" stopColor="#38bdf8" stopOpacity={0.0} />
+                  </linearGradient>
+                  <linearGradient id="cpuGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.4} />
+                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0.0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.15)" />
+                <XAxis dataKey="name" stroke="#64748b" fontSize={12} />
+                <YAxis stroke="#64748b" fontSize={12} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "#0f172a",
+                    borderColor: "rgba(148, 163, 184, 0.3)",
+                    borderRadius: "8px",
+                    fontSize: "13px",
+                  }}
+                />
+                <Area type="monotone" dataKey="latency" name="p95 Latency (ms)" stroke="#38bdf8" fill="url(#latencyGradient)" />
+                <Area type="monotone" dataKey="cpu" name="CPU Usage (%)" stroke="#ef4444" fill="url(#cpuGradient)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
 
@@ -284,7 +318,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
         {incidents.length === 0 ? (
           <div style={{ textAlign: "center", padding: "32px", color: "#94a3b8" }}>
             <CheckCircle2 className="w-8 h-8 mx-auto mb-2 text-emerald-500" style={{ margin: "0 auto 8px auto", color: "#10b981" }} />
-            <div>Zero open incidents. All service thresholds nominal.</div>
+            <div>No incidents recorded</div>
           </div>
         ) : (
           <div style={{ overflowX: "auto" }}>
@@ -306,7 +340,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                     <td style={{ padding: "12px", color: "#e2e8f0" }}>{inc.service}</td>
                     <td style={{ padding: "12px", color: "#94a3b8" }}>{inc.metric}</td>
                     <td style={{ padding: "12px", fontWeight: 700, color: inc.actualValue > inc.threshold ? "#ef4444" : "#f1f5f9" }}>
-                      {inc.actualValue}s (target: {inc.threshold}s)
+                      {inc.actualValue != null ? `${inc.actualValue}s` : "No measurement available"} (target: {inc.threshold != null ? `${inc.threshold}s` : "No target defined"})
                     </td>
                     <td style={{ padding: "12px" }}>
                       <StatusBadge status={inc.severity} size="sm" />

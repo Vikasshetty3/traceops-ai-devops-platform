@@ -4,11 +4,11 @@ export interface RCAInput {
   actualValue: number;
   threshold: number;
   requirementId: string;
-  logs: string[];
-  deploymentChanged: boolean;
-  cpuUsage: number;
-  memoryUsage: number;
-  errorRate: number;
+  logs?: string[];
+  deploymentChanged?: boolean;
+  cpuUsage?: number;
+  memoryUsage?: number;
+  errorRate?: number;
 }
 
 export interface RCAResult {
@@ -22,11 +22,11 @@ export const analyzeRootCause = (
   input: RCAInput
 ): RCAResult => {
   const evidence: string[] = [];
-  let rootCause = "Unknown";
+  let rootCause = "Undetermined - telemetry within expected ranges";
   let recommendedAction = "Investigate service manually";
   let confidence = 0.5;
 
-  if (input.errorRate > 5 && input.deploymentChanged) {
+  if (input.errorRate != null && input.errorRate > 5 && input.deploymentChanged) {
     rootCause = "Recent deployment may have introduced application errors";
     evidence.push(
       `Error rate is ${input.errorRate}%`
@@ -36,21 +36,21 @@ export const analyzeRootCause = (
     );
     recommendedAction = "Consider rolling back the latest deployment";
     confidence = 0.9;
-  } else if (input.cpuUsage > 85) {
+  } else if (input.cpuUsage != null && input.cpuUsage > 85) {
     rootCause = "High CPU utilization";
     evidence.push(
       `CPU usage is ${input.cpuUsage}%`
     );
     recommendedAction = "Scale the service horizontally";
     confidence = 0.88;
-  } else if (input.memoryUsage > 85) {
+  } else if (input.memoryUsage != null && input.memoryUsage > 85) {
     rootCause = "High memory utilization";
     evidence.push(
       `Memory usage is ${input.memoryUsage}%`
     );
     recommendedAction = "Increase memory resources or scale the service";
     confidence = 0.86;
-  } else if (input.errorRate > 5) {
+  } else if (input.errorRate != null && input.errorRate > 5) {
     rootCause = "High application error rate";
     evidence.push(
       `Error rate is ${input.errorRate}%`
@@ -66,7 +66,7 @@ export const analyzeRootCause = (
     confidence = 0.7;
   }
 
-  if (input.logs.length > 0) {
+  if (input.logs && input.logs.length > 0) {
     evidence.push(
       `${input.logs.length} application log entries were provided`
     );

@@ -3,6 +3,7 @@ import path from "path";
 import { CodeIssue, ICodeIssue } from "../models/CodeIssue";
 import { CodeRepair, ICodeRepair } from "../models/CodeRepair";
 import { ProjectStorageService } from "./projectStorageService";
+import { ProjectRuntimeInspector } from "./projectRuntimeInspector";
 
 export class CodeRepairService {
   /**
@@ -35,10 +36,11 @@ export class CodeRepairService {
     const beforeContent = fs.readFileSync(targetFilePath, "utf-8");
     const beforeHash = ProjectStorageService.computeFileHash(targetFilePath);
 
-    // 3. Synthesize code fix
+    // 3. Synthesize code fix with real project runtime inspection
     const { patchedContent, explanation, riskLevel } = this.applyPatchToContent(
       beforeContent,
-      issue
+      issue,
+      workspaceDir
     );
 
     // 4. Write patched file into sandbox workspace
@@ -83,7 +85,8 @@ export class CodeRepairService {
    */
   private static applyPatchToContent(
     content: string,
-    issue: ICodeIssue
+    issue: ICodeIssue,
+    workspaceDir?: string
   ): { patchedContent: string; explanation: string; riskLevel: "LOW" | "MEDIUM" | "HIGH" } {
     let patchedContent = content;
     let explanation = "";
@@ -176,11 +179,43 @@ export class CodeRepairService {
       }
 
       case "DOCKER_MISCONFIGURATION": {
-        if (!content.includes("HEALTHCHECK")) {
-          patchedContent = `${content.trim()}\n\nEXPOSE 5000\nHEALTHCHECK --interval=15s --timeout=3s CMD curl -f http://localhost:5000/health || exit 1\n`;
-          explanation = "Appended EXPOSE port and container HEALTHCHECK probe instruction to Dockerfile.";
-          riskLevel = "LOW";
+        const runtimeInfo = workspaceDir
+          ? ProjectRuntimeInspector.inspect(workspaceDir)
+          : {
+              port: 8080,
+              portSource: "Default",
+              hasHealthEndpoint: true,
+              healthEndpoint: "/health",
+              healthEndpointSource: "Default",
+              isCurlAvailable: false,
+              isNode: true,
+              isPython: false,
+              recommendedHealthCmd: `CMD node -e "require('http').get('http://localhost:8080/health', (r) => { process.exit(r.statusCode === 200 ? 0 : 1); }).on('error', () => process.exit(1));"`,
+              recommendedHealthcheckInstruction: `HEALTHCHECK --interval=15s --timeout=3s CMD node -e "require('http').get('http://localhost:8080/health', (r) => { process.exit(r.statusCode === 200 ? 0 : 1); }).on('error', () => process.exit(1));"`,
+              explanation: "Default inspection",
+            };
+
+        const patchLines: string[] = [];
+
+        // 1. EXPOSE port from real runtime configuration
+        if (!content.includes("EXPOSE")) {
+          patchLines.push(`EXPOSE ${runtimeInfo.port}`);
         }
+
+        // 2. HEALTHCHECK instruction from real verified health endpoint
+        if (!content.includes("HEALTHCHECK")) {
+          if (runtimeInfo.hasHealthEndpoint && runtimeInfo.healthEndpoint && runtimeInfo.recommendedHealthcheckInstruction) {
+            patchLines.push(runtimeInfo.recommendedHealthcheckInstruction);
+            explanation = `Verified real listening port ${runtimeInfo.port} (from ${runtimeInfo.portSource}) and health endpoint ${runtimeInfo.healthEndpoint} (from ${runtimeInfo.healthEndpointSource}). Curl available: ${runtimeInfo.isCurlAvailable}. Generated verified non-curl HEALTHCHECK instruction.`;
+          } else {
+            explanation = `Verified real listening port ${runtimeInfo.port} (from ${runtimeInfo.portSource}). No verified application health endpoint available; leaving HEALTHCHECK unchanged.`;
+          }
+        }
+
+        if (patchLines.length > 0) {
+          patchedContent = `${content.trim()}\n\n${patchLines.join("\n")}\n`;
+        }
+        riskLevel = "LOW";
         break;
       }
 

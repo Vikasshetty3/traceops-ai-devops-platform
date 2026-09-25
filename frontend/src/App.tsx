@@ -54,6 +54,7 @@ export const App: React.FC = () => {
   const [telemetry, setTelemetry] = useState<ServiceTelemetry[]>([]);
   const [traceGraph, setTraceGraph] = useState<TraceGraphNode[]>([]);
   const [selectedReqId, setSelectedReqId] = useState<string>("REQ-001");
+  const [repairProjectId, setRepairProjectId] = useState<string>("");
 
   // Fetch all primary datasets
   const loadAllData = useCallback(async () => {
@@ -61,15 +62,15 @@ export const App: React.FC = () => {
       setError(null);
       const [projs, reqs, slosData, incs, rcaData, exps, actions, telem, graph] =
         await Promise.all([
-          api.getProjects().catch(() => []),
-          api.getRequirements().catch(() => []),
-          api.getSLOs().catch(() => []),
-          api.getIncidents().catch(() => []),
-          api.getRCAs().catch(() => []),
-          api.getExperiments().catch(() => []),
-          api.getDevOpsActions().catch(() => []),
-          api.getTelemetry().catch(() => []),
-          api.getTraceGraph().catch(() => []),
+          api.getProjects(),
+          api.getRequirements(),
+          api.getSLOs(),
+          api.getIncidents(),
+          api.getRCAs(),
+          api.getExperiments(),
+          api.getDevOpsActions(),
+          api.getTelemetry(),
+          api.getTraceGraph(),
         ]);
 
       setProjects(projs || []);
@@ -152,10 +153,10 @@ export const App: React.FC = () => {
       metric: incident.metric,
       actualValue: incident.actualValue,
       threshold: incident.threshold,
-      cpuUsage: incident.metrics?.cpuUsage || 88,
-      memoryUsage: incident.metrics?.memoryUsage || 64,
-      errorRate: incident.metrics?.errorRate || 2.0,
-      deploymentChanged: incident.metrics?.deploymentChanged || false,
+      cpuUsage: incident.metrics?.cpuUsage,
+      memoryUsage: incident.metrics?.memoryUsage,
+      errorRate: incident.metrics?.errorRate,
+      deploymentChanged: Boolean(incident.metrics?.deploymentChanged),
       logs: incident.logs,
     });
     await loadAllData();
@@ -171,10 +172,10 @@ export const App: React.FC = () => {
       metric: incident.metric,
       actualValue: incident.actualValue,
       threshold: incident.threshold,
-      cpuUsage: incident.metrics?.cpuUsage || 88,
-      memoryUsage: incident.metrics?.memoryUsage || 64,
-      errorRate: incident.metrics?.errorRate || 2.0,
-      deploymentChanged: incident.metrics?.deploymentChanged || false,
+      cpuUsage: incident.metrics?.cpuUsage,
+      memoryUsage: incident.metrics?.memoryUsage,
+      errorRate: incident.metrics?.errorRate,
+      deploymentChanged: Boolean(incident.metrics?.deploymentChanged),
       logs: incident.logs,
     });
     await loadAllData();
@@ -296,10 +297,14 @@ export const App: React.FC = () => {
                   setSelectedReqId("");
                   setActiveTab("traceability");
                 }}
+                onNavigateToRepair={(projectId) => {
+                  setRepairProjectId(projectId);
+                  setActiveTab("repair");
+                }}
               />
             )}
 
-            {activeTab === "repair" && <RepairTab />}
+            {activeTab === "repair" && <RepairTab initialProjectId={repairProjectId} />}
 
             {activeTab === "requirements" && (
               <RequirementsTab

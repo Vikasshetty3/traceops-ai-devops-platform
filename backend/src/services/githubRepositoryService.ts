@@ -42,11 +42,18 @@ export class GithubRepositoryService {
       return { valid: false, repositoryUrl: rawUrl || "", normalizedUrl: "", owner: "", repository: "", error: "Repository URL is required." };
     }
 
-    const trimmed = rawUrl.trim();
+    let trimmed = rawUrl.trim();
 
     // Prevent command injection / path traversal characters
     if (/[;&|`$<>]/.test(trimmed)) {
       return { valid: false, repositoryUrl: trimmed, normalizedUrl: "", owner: "", repository: "", error: "Security Violation: Illegal characters in repository URL." };
+    }
+
+    // Auto-normalize if user typed github.com/... or http://github.com/...
+    if (trimmed.startsWith("http://github.com/")) {
+      trimmed = "https://" + trimmed.slice(7);
+    } else if (trimmed.startsWith("github.com/")) {
+      trimmed = "https://" + trimmed;
     }
 
     if (!trimmed.startsWith("https://github.com/")) {
@@ -88,6 +95,7 @@ export class GithubRepositoryService {
    * - Never executes repository code or install scripts.
    * - Clones with --depth 1 in an isolated temp directory.
    * - Enforces 60s execution timeout and cleans up immediately.
+   * - Supports server-side GITHUB_TOKEN without exposing secrets.
    */
   public static async cloneAndAcquireRepository(
     projectId: string,
@@ -116,7 +124,11 @@ export class GithubRepositoryService {
         }
       }
 
-      const cloneCmd = `git clone --depth 1 ${branchArg} "${meta.normalizedUrl}.git" "${tempAcquisitionDir}"`;
+      // Safe authentication using http.extraHeader if GITHUB_TOKEN is present
+      const token = process.env.GITHUB_TOKEN?.trim();
+      const authHeader = token ? `-c http.extraHeader="Authorization: Bearer ${token}"` : "";
+
+      const cloneCmd = `git ${authHeader} clone --depth 1 ${branchArg} "${meta.normalizedUrl}.git" "${tempAcquisitionDir}"`;
 
       // Execute controlled git clone with timeout
       await execAsync(cloneCmd, {
@@ -125,7 +137,7 @@ export class GithubRepositoryService {
       });
 
       // Resolve exact commit SHA
-      let commitSha = "unknown";
+      let commitSha = "";
       try {
         const { stdout } = await execAsync(`git rev-parse HEAD`, {
           cwd: tempAcquisitionDir,
@@ -133,7 +145,7 @@ export class GithubRepositoryService {
         });
         commitSha = stdout.trim();
       } catch (err) {
-        commitSha = crypto.randomBytes(20).toString("hex");
+        commitSha = "";
       }
 
       // Resolve current branch
@@ -191,7 +203,9 @@ export class GithubRepositoryService {
     }
 
     const cleanBranch = branch.trim().replace(/[^a-zA-Z0-9/_.\-]/g, "") || "HEAD";
-    const lsRemoteCmd = `git ls-remote "${meta.normalizedUrl}.git" "${cleanBranch}"`;
+    const token = process.env.GITHUB_TOKEN?.trim();
+    const authHeader = token ? `-c http.extraHeader="Authorization: Bearer ${token}"` : "";
+    const lsRemoteCmd = `git ${authHeader} ls-remote "${meta.normalizedUrl}.git" "${cleanBranch}"`;
 
     const { stdout } = await execAsync(lsRemoteCmd, {
       timeout: 15000,

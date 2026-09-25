@@ -7,11 +7,11 @@ export interface GeminiRCAInput {
   metric: string;
   actualValue: number;
   threshold: number;
-  logs: string[];
-  cpuUsage: number;
-  memoryUsage: number;
-  errorRate: number;
-  deploymentChanged: boolean;
+  logs?: string[];
+  cpuUsage?: number;
+  memoryUsage?: number;
+  errorRate?: number;
+  deploymentChanged?: boolean;
   incidentId?: string;
 }
 
@@ -59,19 +59,19 @@ Threshold:
 ${input.threshold}
 
 CPU Usage:
-${input.cpuUsage}%
+${input.cpuUsage != null ? `${input.cpuUsage}%` : "No measurement available"}
 
 Memory Usage:
-${input.memoryUsage}%
+${input.memoryUsage != null ? `${input.memoryUsage}%` : "No measurement available"}
 
 Error Rate:
-${input.errorRate}%
+${input.errorRate != null ? `${input.errorRate}%` : "No measurement available"}
 
 Recent Deployment Changed:
-${input.deploymentChanged}
+${input.deploymentChanged ? "Yes" : "No"}
 
 Application Logs:
-${(input.logs || []).join("\n")}
+${(input.logs || []).length > 0 ? (input.logs || []).join("\n") : "No logs recorded"}
 
 Return ONLY valid JSON in exactly this structure:
 
@@ -123,13 +123,13 @@ Rules:
   if (input.actualValue > input.threshold) {
     evidence.push(`${input.metric} (${input.actualValue}) exceeded SLO threshold of ${input.threshold}`);
   }
-  if (input.cpuUsage > 80) {
+  if (input.cpuUsage != null && input.cpuUsage > 80) {
     evidence.push(`High CPU utilization detected at ${input.cpuUsage}%`);
   }
-  if (input.memoryUsage > 80) {
+  if (input.memoryUsage != null && input.memoryUsage > 80) {
     evidence.push(`Elevated memory pressure observed at ${input.memoryUsage}%`);
   }
-  if (input.errorRate > 0) {
+  if (input.errorRate != null && input.errorRate > 0) {
     evidence.push(`Error rate elevated at ${input.errorRate}%`);
   }
   if (input.logs && input.logs.length > 0) {
@@ -140,7 +140,7 @@ Rules:
     rootCause = "Redis cache connection timeout and cluster latency spike";
     recommendedAction = "Scale Redis replica instances and adjust client socket timeout to 2500ms";
     confidence = 0.91;
-  } else if (input.cpuUsage > 90 && input.service.toLowerCase().includes("auth")) {
+  } else if (input.cpuUsage != null && input.cpuUsage > 90 && input.service.toLowerCase().includes("auth")) {
     rootCause = "JWT cryptographic signature verification CPU saturation under traffic spike";
     recommendedAction = "Scale authentication pod replicas from 2 to 4 and enable JWK caching";
     confidence = 0.88;

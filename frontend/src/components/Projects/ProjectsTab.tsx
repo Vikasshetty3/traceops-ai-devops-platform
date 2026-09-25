@@ -1,9 +1,16 @@
-import React, { useState } from "react";
-import type { Project, Requirement, SLO } from "../../types";
+import React, { useState, useEffect } from "react";
+import type {
+  Project,
+  Requirement,
+  SLO,
+  CodeIssue,
+  CodeRepair,
+  Deployment,
+  DeploymentVerification,
+} from "../../types";
 import { api } from "../../services/api";
 import {
   FolderGit2,
-  UploadCloud,
   FileCode,
   Zap,
   Trash2,
@@ -13,6 +20,10 @@ import {
   Workflow,
   RefreshCw,
   Search,
+  Download,
+  Wrench,
+  Plus,
+  Check,
 } from "lucide-react";
 
 interface ProjectsTabProps {
@@ -21,6 +32,7 @@ interface ProjectsTabProps {
   slos: SLO[];
   onRefresh: () => Promise<void>;
   onSelectProjectTraceability: (projectId: string) => void;
+  onNavigateToRepair?: (projectId: string) => void;
 }
 
 export const ProjectsTab: React.FC<ProjectsTabProps> = ({
@@ -29,9 +41,10 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({
   slos,
   onRefresh,
   onSelectProjectTraceability,
+  onNavigateToRepair,
 }) => {
   const [showModal, setShowModal] = useState(false);
-  const [onboardMode, setOnboardMode] = useState<"ZIP" | "GITHUB">("ZIP");
+  const [onboardMode, setOnboardMode] = useState<"ZIP" | "GITHUB">("GITHUB");
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [projectName, setProjectName] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -43,6 +56,52 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({
   const [filterQuery, setFilterQuery] = useState("");
   const [isCheckingUpdates, setIsCheckingUpdates] = useState(false);
   const [updateStatusMsg, setUpdateStatusMsg] = useState<string | null>(null);
+
+  // Autonomous Repair & Deployment History per Project
+  const [projectIssues, setProjectIssues] = useState<CodeIssue[]>([]);
+  const [projectRepairs, setProjectRepairs] = useState<CodeRepair[]>([]);
+  const [projectDeployments, setProjectDeployments] = useState<Deployment[]>([]);
+  const [projectVerifications, setProjectVerifications] = useState<DeploymentVerification[]>([]);
+  const [loadingRepairData, setLoadingRepairData] = useState<boolean>(false);
+  const [downloadingProjectId, setDownloadingProjectId] = useState<string | null>(null);
+  const [downloadSuccessMsg, setDownloadSuccessMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (selectedProject?.projectId) {
+      loadProjectRepairData(selectedProject.projectId);
+    }
+  }, [selectedProject?.projectId]);
+
+  const loadProjectRepairData = async (projectId: string) => {
+    setLoadingRepairData(true);
+    try {
+      const history = await api.getRepairHistory(projectId);
+      setProjectIssues(history.issues || []);
+      setProjectRepairs(history.repairs || []);
+      setProjectDeployments(history.deployments || []);
+      setProjectVerifications(history.verifications || []);
+    } catch {
+      setProjectIssues([]);
+      setProjectRepairs([]);
+      setProjectDeployments([]);
+      setProjectVerifications([]);
+    } finally {
+      setLoadingRepairData(false);
+    }
+  };
+
+  const handleDownloadLatestRepair = async (projectId: string) => {
+    setDownloadingProjectId(projectId);
+    setDownloadSuccessMsg(null);
+    try {
+      const res = await api.downloadLatestRepairedProjectZip(projectId);
+      setDownloadSuccessMsg(`Downloaded "${res.fileName}" successfully!`);
+    } catch (err: any) {
+      alert("Download failed: " + (err.message || String(err)));
+    } finally {
+      setDownloadingProjectId(null);
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -60,29 +119,53 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({
       setErrorMsg("Please select a project ZIP archive.");
       return;
     }
-    if (onboardMode === "GITHUB" && !githubUrl.trim()) {
-      setErrorMsg("Please enter a valid public GitHub repository URL.");
-      return;
-    }
 
     setIsUploading(true);
     setErrorMsg(null);
 
     if (onboardMode === "GITHUB") {
+      let rawUrl = githubUrl.trim();
+      if (!rawUrl) {
+        setErrorMsg("Please enter a valid public GitHub repository URL.");
+        setIsUploading(false);
+        return;
+      }
+
+      if (/[;&|`$<>]/.test(rawUrl)) {
+        setErrorMsg("Security Violation: URL contains illegal characters.");
+        setIsUploading(false);
+        return;
+      }
+
+      if (rawUrl.startsWith("http://github.com/")) {
+        rawUrl = "https://" + rawUrl.slice(7);
+      } else if (rawUrl.startsWith("github.com/")) {
+        rawUrl = "https://" + rawUrl;
+      }
+
+      const match = rawUrl.match(/^https:\/\/github\.com\/([a-zA-Z0-9_.\-]+)\/([a-zA-Z0-9_.\-]+?)(?:\.git|\/.*)?$/);
+      if (!match) {
+        setErrorMsg("Malformed GitHub repository URL. Expected: https://github.com/owner/repository");
+        setIsUploading(false);
+        return;
+      }
+
       setUploadStep("Validating GitHub repository URL format...");
-      setTimeout(() => setUploadStep("Cloning repository with --depth 1 in secure sandbox..."), 600);
-      setTimeout(() => setUploadStep("Resolving commit SHA & head branch..."), 1200);
-      setTimeout(() => setUploadStep("Preserving immutable project storage..."), 1800);
-      setTimeout(() => setUploadStep("Running static AST & requirement discovery..."), 2400);
+      setTimeout(() => setUploadStep("Cloning repository safely (--depth 1) into isolated sandbox..."), 500);
+      setTimeout(() => setUploadStep("Resolving Git commit SHA & head branch..."), 1200);
+      setTimeout(() => setUploadStep("Creating isolated project workspace in storage..."), 1900);
+      setTimeout(() => setUploadStep("Running static AST & dependency discovery..."), 2600);
+      setTimeout(() => setUploadStep("Extracting explicit requirements & generating SLOs..."), 3300);
+      setTimeout(() => setUploadStep("Building project-scoped traceability graph..."), 4000);
 
       try {
         const result = await api.onboardGithubProject(
-          githubUrl.trim(),
+          rawUrl,
           githubBranch.trim() || undefined,
           projectName.trim() || undefined
         );
 
-        setUploadStep("Finalizing project operational model & traceability graph...");
+        setUploadStep("Completed! Onboarding finished.");
         await onRefresh();
         setShowModal(false);
         setGithubUrl("");
@@ -265,8 +348,8 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({
               boxShadow: "0 4px 12px rgba(79, 70, 229, 0.3)",
             }}
           >
-            <UploadCloud className="w-4 h-4" />
-            Onboard Project ZIP
+            <Plus className="w-4 h-4" />
+            Add Project
           </button>
         </div>
       </div>
@@ -355,7 +438,7 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                   <div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px", flexWrap: "wrap" }}>
                       <span
                         style={{
                           fontSize: "11px",
@@ -381,10 +464,38 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({
                       >
                         {p.status}
                       </span>
+                      <span
+                        style={{
+                          fontSize: "11px",
+                          fontWeight: 600,
+                          backgroundColor: p.sourceType === "GITHUB" ? "rgba(99, 102, 241, 0.2)" : "rgba(148, 163, 184, 0.15)",
+                          color: p.sourceType === "GITHUB" ? "#a5b4fc" : "#cbd5e1",
+                          padding: "2px 8px",
+                          borderRadius: "4px",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "4px",
+                        }}
+                      >
+                        {p.sourceType === "GITHUB" ? (
+                          <>
+                            <Workflow className="w-3 h-3" /> GitHub
+                          </>
+                        ) : (
+                          <>
+                            <FolderGit2 className="w-3 h-3" /> ZIP Upload
+                          </>
+                        )}
+                      </span>
                     </div>
                     <h3 style={{ fontSize: "16px", fontWeight: 700, color: "#f8fafc", margin: 0 }}>
                       {p.name}
                     </h3>
+                    {p.repositoryUrl && (
+                      <div style={{ fontSize: "12px", color: "#60a5fa", marginTop: "2px" }}>
+                        {p.repositoryOwner}/{p.repositoryName}
+                      </div>
+                    )}
                   </div>
 
                   <button
@@ -478,25 +589,33 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({
                   <div>
                     <div style={{ fontSize: "10px", color: "#64748b", textTransform: "uppercase" }}>Services</div>
                     <div style={{ fontSize: "14px", fontWeight: 700, color: "#f8fafc" }}>
-                      {p.analysisSummary.servicesCount || p.services?.length || 0}
+                      {p.status === "ANALYZED"
+                        ? (p.analysisSummary?.servicesCount ?? p.services?.length ?? 0)
+                        : "—"}
                     </div>
                   </div>
                   <div>
                     <div style={{ fontSize: "10px", color: "#64748b", textTransform: "uppercase" }}>Explicit</div>
                     <div style={{ fontSize: "14px", fontWeight: 700, color: "#38bdf8" }}>
-                      {p.analysisSummary.explicitRequirementsCount || 0}
+                      {p.status === "ANALYZED"
+                        ? (p.analysisSummary?.explicitRequirementsCount ?? 0)
+                        : "—"}
                     </div>
                   </div>
                   <div>
                     <div style={{ fontSize: "10px", color: "#64748b", textTransform: "uppercase" }}>Inferred</div>
                     <div style={{ fontSize: "14px", fontWeight: 700, color: "#e2e8f0" }}>
-                      {p.analysisSummary.inferredRequirementsCount || 0}
+                      {p.status === "ANALYZED"
+                        ? (p.analysisSummary?.inferredRequirementsCount ?? 0)
+                        : "—"}
                     </div>
                   </div>
                   <div>
                     <div style={{ fontSize: "10px", color: "#64748b", textTransform: "uppercase" }}>SLOs</div>
                     <div style={{ fontSize: "14px", fontWeight: 700, color: "#a855f7" }}>
-                      {p.analysisSummary.slosCount || p.generatedSLOs?.length || 0}
+                      {p.status === "ANALYZED"
+                        ? (p.analysisSummary?.slosCount ?? p.generatedSLOs?.length ?? 0)
+                        : "—"}
                     </div>
                   </div>
                 </div>
@@ -504,7 +623,7 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({
                 {/* Card Footer Actions */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "auto" }}>
                   <span style={{ fontSize: "12px", color: "#64748b" }}>
-                    Arch: <strong style={{ color: "#94a3b8" }}>{p.analysisSummary.architectureType || "Modular"}</strong>
+                    Arch: <strong style={{ color: "#94a3b8" }}>{p.analysisSummary?.architectureType || "Architecture unspecified"}</strong>
                   </span>
 
                   <span
@@ -555,7 +674,53 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({
               </h2>
             </div>
 
-            <div style={{ display: "flex", gap: "10px" }}>
+            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
+              {projectDeployments.some((d) => d.status === "HEALTHY") && (
+                <button
+                  onClick={() => handleDownloadLatestRepair(selectedProject.projectId)}
+                  disabled={downloadingProjectId === selectedProject.projectId}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    padding: "8px 16px",
+                    backgroundColor: "#059669",
+                    color: "#ffffff",
+                    border: "none",
+                    borderRadius: "8px",
+                    cursor: downloadingProjectId === selectedProject.projectId ? "not-allowed" : "pointer",
+                    fontSize: "13px",
+                    fontWeight: 700,
+                    boxShadow: "0 2px 10px rgba(16, 185, 129, 0.3)",
+                  }}
+                >
+                  <Download className="w-4 h-4" />
+                  {downloadingProjectId === selectedProject.projectId ? "Packaging..." : "Download Repaired Project"}
+                </button>
+              )}
+
+              {onNavigateToRepair && (
+                <button
+                  onClick={() => onNavigateToRepair(selectedProject.projectId)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    padding: "8px 16px",
+                    backgroundColor: "#1e1b4b",
+                    color: "#a5b4fc",
+                    border: "1px solid rgba(99, 102, 241, 0.4)",
+                    borderRadius: "8px",
+                    cursor: "pointer",
+                    fontSize: "13px",
+                    fontWeight: 600,
+                  }}
+                >
+                  <Wrench className="w-4 h-4" />
+                  Autonomous Repair Studio
+                </button>
+              )}
+
               <button
                 onClick={() => onSelectProjectTraceability(selectedProject.projectId)}
                 style={{
@@ -578,6 +743,25 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({
             </div>
           </div>
 
+          {downloadSuccessMsg && (
+            <div
+              style={{
+                padding: "10px 14px",
+                backgroundColor: "rgba(16, 185, 129, 0.15)",
+                border: "1px solid #10b981",
+                borderRadius: "8px",
+                color: "#a7f3d0",
+                fontSize: "13px",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+              }}
+            >
+              <Check className="w-4 h-4 text-emerald-400" />
+              <span>{downloadSuccessMsg}</span>
+            </div>
+          )}
+
           {/* Infrastructure & Frameworks Grid */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px" }}>
             {selectedProject.sourceType === "GITHUB" && (
@@ -592,7 +776,7 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                     <span style={{ fontSize: "11px", backgroundColor: "#1e293b", color: "#38bdf8", padding: "2px 8px", borderRadius: "4px" }}>
-                      Branch: {selectedProject.repositoryBranch || "main"}
+                      {selectedProject.repositoryBranch ? `Branch: ${selectedProject.repositoryBranch}` : "No branch specified"}
                     </span>
                     {selectedProject.commitSha && (
                       <span style={{ fontSize: "11px", backgroundColor: "#1e293b", color: "#a78bfa", padding: "2px 8px", borderRadius: "4px", fontFamily: "monospace" }}>
@@ -600,7 +784,7 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({
                       </span>
                     )}
                   </div>
-                  {selectedProject.repositoryUrl && (
+                  {selectedProject.repositoryUrl ? (
                     <a
                       href={selectedProject.repositoryUrl}
                       target="_blank"
@@ -609,6 +793,10 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({
                     >
                       {selectedProject.repositoryUrl} ↗
                     </a>
+                  ) : (
+                    <div style={{ fontSize: "12px", color: "#94a3b8", fontStyle: "italic", marginTop: "4px" }}>
+                      Repository URL unavailable
+                    </div>
                   )}
                   <div style={{ marginTop: "8px" }}>
                     <button
@@ -670,7 +858,7 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({
                   </span>
                 ))}
                 {selectedProject.techStack.containerization?.length === 0 && selectedProject.techStack.cicd?.length === 0 && (
-                  <span style={{ fontSize: "12px", color: "#64748b" }}>Standard process runtime</span>
+                  <span style={{ fontSize: "12px", color: "#64748b" }}>No container or CI/CD configuration detected</span>
                 )}
               </div>
             </div>
@@ -678,7 +866,7 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({
             <div style={{ backgroundColor: "#020617", padding: "16px", borderRadius: "8px", border: "1px solid rgba(148, 163, 184, 0.1)" }}>
               <div style={{ fontSize: "12px", color: "#64748b", display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" }}>
                 <Server className="w-4 h-4 text-emerald-400" />
-                Discovered Services ({selectedProject.services?.length || 0})
+                Discovered Services ({selectedProject.services ? selectedProject.services.length : 0})
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                 {selectedProject.services?.map((s) => (
@@ -687,8 +875,116 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({
                   </div>
                 ))}
                 {(!selectedProject.services || selectedProject.services.length === 0) && (
-                  <span style={{ fontSize: "12px", color: "#64748b" }}>Primary microservice</span>
+                  <span style={{ fontSize: "12px", color: "#64748b" }}>No services detected</span>
                 )}
+              </div>
+            </div>
+          </div>
+
+          {/* Autonomous Repair & Live Deployment Status Card (Step 16) */}
+          <div
+            style={{
+              backgroundColor: "#020617",
+              border: "1px solid rgba(99, 102, 241, 0.25)",
+              borderRadius: "10px",
+              padding: "18px 20px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "14px",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <Wrench className="w-4 h-4 text-indigo-400" />
+                <h3 style={{ fontSize: "15px", fontWeight: 700, color: "#f8fafc", margin: 0 }}>
+                  Autonomous DevOps & Self-Healing Pipeline
+                </h3>
+              </div>
+
+              <div style={{ display: "flex", gap: "8px" }}>
+                {projectDeployments.some((d) => d.status === "HEALTHY") && (
+                  <button
+                    onClick={() => handleDownloadLatestRepair(selectedProject.projectId)}
+                    disabled={downloadingProjectId === selectedProject.projectId}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      padding: "6px 14px",
+                      backgroundColor: "#059669",
+                      color: "#ffffff",
+                      border: "none",
+                      borderRadius: "6px",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      cursor: downloadingProjectId === selectedProject.projectId ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    Download Repaired Project
+                  </button>
+                )}
+
+                {onNavigateToRepair && (
+                  <button
+                    onClick={() => onNavigateToRepair(selectedProject.projectId)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      padding: "6px 14px",
+                      backgroundColor: "#1e1b4b",
+                      border: "1px solid rgba(99, 102, 241, 0.4)",
+                      borderRadius: "6px",
+                      color: "#c7d2fe",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Open Repair Studio →
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "10px" }}>
+              <div style={{ backgroundColor: "#0f172a", padding: "12px", borderRadius: "8px", border: "1px solid rgba(148, 163, 184, 0.1)" }}>
+                <div style={{ fontSize: "11px", color: "#64748b", textTransform: "uppercase" }}>Detected Issues</div>
+                <div style={{ fontSize: "15px", fontWeight: 700, color: projectIssues.length > 0 ? "#fca5a5" : "#34d399", marginTop: "2px" }}>
+                  {loadingRepairData
+                    ? "Loading..."
+                    : projectIssues.length === 0
+                    ? "No issues detected"
+                    : `${projectIssues.length} ${projectIssues.length === 1 ? "Issue" : "Issues"}`}
+                </div>
+              </div>
+
+              <div style={{ backgroundColor: "#0f172a", padding: "12px", borderRadius: "8px", border: "1px solid rgba(148, 163, 184, 0.1)" }}>
+                <div style={{ fontSize: "11px", color: "#64748b", textTransform: "uppercase" }}>Repairs Generated</div>
+                <div style={{ fontSize: "15px", fontWeight: 700, color: "#38bdf8", marginTop: "2px" }}>
+                  {loadingRepairData
+                    ? "Loading..."
+                    : projectRepairs.length === 0
+                    ? "No repairs"
+                    : `${projectRepairs.length} ${projectRepairs.length === 1 ? "Repair" : "Repairs"}`}
+                </div>
+              </div>
+
+              <div style={{ backgroundColor: "#0f172a", padding: "12px", borderRadius: "8px", border: "1px solid rgba(148, 163, 184, 0.1)" }}>
+                <div style={{ fontSize: "11px", color: "#64748b", textTransform: "uppercase" }}>Deployment Status</div>
+                <div style={{ fontSize: "14px", fontWeight: 700, color: projectDeployments.some((d) => d.status === "HEALTHY") ? "#34d399" : "#94a3b8", marginTop: "2px" }}>
+                  {projectDeployments.length > 0 ? projectDeployments[0].status : "No deployment"}
+                </div>
+              </div>
+
+              <div style={{ backgroundColor: "#0f172a", padding: "12px", borderRadius: "8px", border: "1px solid rgba(148, 163, 184, 0.1)" }}>
+                <div style={{ fontSize: "11px", color: "#64748b", textTransform: "uppercase" }}>SLO Verification</div>
+                <div style={{ fontSize: "13px", fontWeight: 700, color: projectVerifications.some((v) => v.sloCompliant) ? "#34d399" : "#94a3b8", marginTop: "2px" }}>
+                  {projectVerifications.length > 0
+                    ? (projectVerifications[0].sloCompliant ? "COMPLIANT" : "NON-COMPLIANT")
+                    : "SLO verification not available"}
+                </div>
               </div>
             </div>
           </div>
@@ -711,49 +1007,55 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({
                 </h3>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "10px", maxHeight: "360px", overflowY: "auto" }}>
-                {projectReqs.map((r) => (
-                  <div
-                    key={r.requirementId}
-                    style={{
-                      backgroundColor: "#0f172a",
-                      border: "1px solid rgba(148, 163, 184, 0.15)",
-                      borderRadius: "8px",
-                      padding: "12px",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "6px",
-                    }}
-                  >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontSize: "11px", fontWeight: 700, color: "#38bdf8", fontFamily: "monospace" }}>
-                        {r.requirementId}
-                      </span>
-                      <span
-                        style={{
-                          fontSize: "10px",
-                          fontWeight: 600,
-                          backgroundColor: r.requirementType === "EXPLICIT" ? "rgba(16, 185, 129, 0.15)" : "rgba(99, 102, 241, 0.15)",
-                          color: r.requirementType === "EXPLICIT" ? "#34d399" : "#818cf8",
-                          padding: "1px 6px",
-                          borderRadius: "4px",
-                        }}
-                      >
-                        {r.requirementType || "INFERRED"}
-                      </span>
-                    </div>
-                    <div style={{ fontSize: "13px", fontWeight: 600, color: "#f8fafc" }}>
-                      {r.title}
-                    </div>
-                    <div style={{ fontSize: "12px", color: "#94a3b8" }}>
-                      Target: <strong style={{ color: "#e2e8f0" }}>{r.metric} {r.operator} {r.threshold}{r.unit}</strong>
-                    </div>
-                    {r.sourceFile && (
-                      <div style={{ fontSize: "11px", color: "#64748b" }}>
-                        Source: {r.sourceFile}
-                      </div>
-                    )}
+                {projectReqs.length === 0 ? (
+                  <div style={{ padding: "28px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>
+                    No requirements discovered
                   </div>
-                ))}
+                ) : (
+                  projectReqs.map((r) => (
+                    <div
+                      key={r.requirementId}
+                      style={{
+                        backgroundColor: "#0f172a",
+                        border: "1px solid rgba(148, 163, 184, 0.15)",
+                        borderRadius: "8px",
+                        padding: "12px",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "6px",
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ fontSize: "11px", fontWeight: 700, color: "#38bdf8", fontFamily: "monospace" }}>
+                          {r.requirementId}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: "10px",
+                            fontWeight: 600,
+                            backgroundColor: r.requirementType === "EXPLICIT" ? "rgba(16, 185, 129, 0.15)" : "rgba(99, 102, 241, 0.15)",
+                            color: r.requirementType === "EXPLICIT" ? "#34d399" : "#818cf8",
+                            padding: "1px 6px",
+                            borderRadius: "4px",
+                          }}
+                        >
+                          {r.requirementType || "INFERRED"}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: "13px", fontWeight: 600, color: "#f8fafc" }}>
+                        {r.title}
+                      </div>
+                      <div style={{ fontSize: "12px", color: "#94a3b8" }}>
+                        Target: <strong style={{ color: "#e2e8f0" }}>{r.metric} {r.operator} {r.threshold}{r.unit}</strong>
+                      </div>
+                      {r.sourceFile && (
+                        <div style={{ fontSize: "11px", color: "#64748b" }}>
+                          Source: {r.sourceFile}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
               </div>
             </div>
 
@@ -773,35 +1075,43 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({
                 </h3>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "10px", maxHeight: "360px", overflowY: "auto" }}>
-                {projectSLOs.map((s) => (
-                  <div
-                    key={s.sloId}
-                    style={{
-                      backgroundColor: "#0f172a",
-                      border: "1px solid rgba(148, 163, 184, 0.15)",
-                      borderRadius: "8px",
-                      padding: "12px",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "6px",
-                    }}
-                  >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontSize: "11px", fontWeight: 700, color: "#34d399", fontFamily: "monospace" }}>
-                        {s.sloId}
-                      </span>
-                      <span style={{ fontSize: "11px", color: "#94a3b8", backgroundColor: "#1e293b", padding: "1px 6px", borderRadius: "4px" }}>
-                        Window: {s.window || "5m"}
-                      </span>
-                    </div>
-                    <div style={{ fontSize: "13px", fontWeight: 600, color: "#f8fafc" }}>
-                      {s.service} • {s.metric}
-                    </div>
-                    <div style={{ fontSize: "12px", color: "#94a3b8" }}>
-                      Threshold: <strong style={{ color: "#34d399" }}>{s.operator} {s.threshold} {s.unit}</strong>
-                    </div>
+                {projectSLOs.length === 0 ? (
+                  <div style={{ padding: "28px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>
+                    No SLOs defined
                   </div>
-                ))}
+                ) : (
+                  projectSLOs.map((s) => (
+                    <div
+                      key={s.sloId}
+                      style={{
+                        backgroundColor: "#0f172a",
+                        border: "1px solid rgba(148, 163, 184, 0.15)",
+                        borderRadius: "8px",
+                        padding: "12px",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "6px",
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ fontSize: "11px", fontWeight: 700, color: "#34d399", fontFamily: "monospace" }}>
+                          {s.sloId}
+                        </span>
+                        {s.window && (
+                          <span style={{ fontSize: "11px", color: "#94a3b8", backgroundColor: "#1e293b", padding: "1px 6px", borderRadius: "4px" }}>
+                            Window: {s.window}
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: "13px", fontWeight: 600, color: "#f8fafc" }}>
+                        {s.service} • {s.metric}
+                      </div>
+                      <div style={{ fontSize: "12px", color: "#94a3b8" }}>
+                        Threshold: <strong style={{ color: "#34d399" }}>{s.operator} {s.threshold} {s.unit}</strong>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>
@@ -841,10 +1151,15 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <UploadCloud className="w-6 h-6 text-indigo-400" />
-                <h3 style={{ fontSize: "18px", fontWeight: 700, color: "#f8fafc", margin: 0 }}>
-                  Onboard Software Project
-                </h3>
+                <Plus className="w-6 h-6 text-indigo-400" />
+                <div>
+                  <h3 style={{ fontSize: "18px", fontWeight: 700, color: "#f8fafc", margin: 0 }}>
+                    Add Project
+                  </h3>
+                  <p style={{ margin: "2px 0 0 0", fontSize: "12px", color: "#94a3b8" }}>
+                    Onboard via GitHub repository URL or upload a ZIP archive
+                  </p>
+                </div>
               </div>
               {!isUploading && (
                 <button
@@ -866,6 +1181,28 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({
             <div style={{ display: "flex", gap: "8px", borderBottom: "1px solid rgba(148, 163, 184, 0.15)", paddingBottom: "12px" }}>
               <button
                 type="button"
+                onClick={() => setOnboardMode("GITHUB")}
+                disabled={isUploading}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: "6px",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  cursor: isUploading ? "not-allowed" : "pointer",
+                  backgroundColor: onboardMode === "GITHUB" ? "#4f46e5" : "#1e293b",
+                  color: onboardMode === "GITHUB" ? "#ffffff" : "#94a3b8",
+                  border: "none",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                }}
+              >
+                <Workflow className="w-4 h-4" />
+                GitHub Repository URL
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setOnboardMode("ZIP")}
                 disabled={isUploading}
                 style={{
@@ -884,28 +1221,6 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({
               >
                 <FolderGit2 className="w-4 h-4" />
                 Upload ZIP Archive
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setOnboardMode("GITHUB")}
-                disabled={isUploading}
-                style={{
-                  padding: "8px 16px",
-                  borderRadius: "6px",
-                  fontSize: "13px",
-                  fontWeight: 600,
-                  cursor: isUploading ? "not-allowed" : "pointer",
-                  backgroundColor: onboardMode === "GITHUB" ? "#4f46e5" : "#1e293b",
-                  color: onboardMode === "GITHUB" ? "#ffffff" : "#94a3b8",
-                  border: "none",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                }}
-              >
-                <Workflow className="w-4 h-4" />
-                GitHub Repository
               </button>
             </div>
 

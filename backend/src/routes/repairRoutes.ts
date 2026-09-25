@@ -14,6 +14,8 @@ import {
   rollbackDeployment,
   getRepairHistory,
   probeDeployment,
+  downloadRepairedProject,
+  downloadLatestRepairedProject,
 } from "../controllers/repairController";
 
 const router = Router();
@@ -22,6 +24,8 @@ const router = Router();
 router.post("/projects/:projectId/analyze-issues", analyzeProjectIssues);
 router.get("/projects/:projectId/issues", getProjectIssues);
 router.get("/projects/:projectId/repair-history", getRepairHistory);
+router.get("/projects/:projectId/download-repaired", downloadLatestRepairedProject);
+router.get("/projects/:projectId/repairs/:repairId/download", downloadRepairedProject);
 
 // Issues
 router.get("/issues/:issueId", getIssueById);
@@ -34,9 +38,11 @@ router.post("/repairs/:repairId/validate", validateRepair);
 router.post("/repairs/:repairId/approve", approveRepair);
 router.post("/repairs/:repairId/reject", rejectRepair);
 router.post("/repairs/:repairId/deploy", deployRepair);
+router.get("/repairs/:repairId/download", downloadRepairedProject);
 
 // Deployments & Rollback
 router.get("/deployments/:deploymentId", getDeploymentById);
+router.get("/deployments/:deploymentId/verify", getDeploymentById);
 router.get("/deployments/:deploymentId/probe", probeDeployment);
 router.post("/deployments/:deploymentId/rollback", rollbackDeployment);
 

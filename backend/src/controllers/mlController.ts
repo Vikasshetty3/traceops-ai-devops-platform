@@ -33,8 +33,8 @@ export const predictViolation = async (
     }
 
     const prediction = await MLClient.predict({
-      requirementId: requirementId || "REQ-001",
-      service: service || "Checkout",
+      requirementId: requirementId ? String(requirementId) : undefined,
+      service: service ? String(service) : undefined,
       cpuUsage: Number(cpuUsage),
       memoryUsage: Number(memoryUsage),
       errorRate: Number(errorRate),

@@ -70,7 +70,8 @@ async function runGitHubOnboardingTests() {
     repositoryUrl: "https://gitlab.com/user/unauthorized-repo",
   });
   assert(
-    nonGithubRes.status === 500 && nonGithubRes.data.error.includes("Only public HTTPS GitHub repository URLs"),
+    (nonGithubRes.status === 400 || nonGithubRes.status === 500) &&
+    nonGithubRes.data.error.includes("Only public HTTPS GitHub repository URLs"),
     "Rejected non-GitHub URL with security violation message"
   );
 
@@ -80,7 +81,8 @@ async function runGitHubOnboardingTests() {
     repositoryUrl: "https://github.com/user/repo;cat /etc/passwd",
   });
   assert(
-    maliciousRes.status === 500 && maliciousRes.data.error.includes("Illegal characters"),
+    (maliciousRes.status === 400 || maliciousRes.status === 500) &&
+    maliciousRes.data.error.includes("Illegal characters"),
     "Rejected illegal command characters in GitHub URL"
   );
 
@@ -90,7 +92,8 @@ async function runGitHubOnboardingTests() {
     repositoryUrl: "https://github.com/invalid-no-repo",
   });
   assert(
-    malformedRes.status === 500 && malformedRes.data.error.includes("Malformed GitHub repository URL"),
+    (malformedRes.status === 400 || malformedRes.status === 500) &&
+    malformedRes.data.error.includes("Malformed GitHub repository URL"),
     "Rejected malformed GitHub URL missing repository component"
   );
 

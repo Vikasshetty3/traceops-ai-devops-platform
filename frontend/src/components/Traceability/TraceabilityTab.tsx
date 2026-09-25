@@ -25,7 +25,7 @@ export const TraceabilityTab: React.FC<TraceabilityTabProps> = ({
   onSelectRequirement,
 }) => {
   const [activeReqId, setActiveReqId] = useState<string>(
-    selectedReqId || graph[0]?.requirement?.requirementId || "REQ-001"
+    selectedReqId || graph[0]?.requirement?.requirementId || requirements[0]?.requirementId || ""
   );
 
   const activeNode =
@@ -81,99 +81,123 @@ export const TraceabilityTab: React.FC<TraceabilityTabProps> = ({
               overflowX: "auto",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", minWidth: "900px", gap: "10px" }}>
+            <div style={{ display: "flex", alignItems: "center", minWidth: "900px", gap: "10px", flexWrap: "wrap" }}>
               {/* 1. Requirement Node */}
-              <div style={{ flex: 1, padding: "14px", borderRadius: "8px", background: "rgba(56, 189, 248, 0.1)", border: "1px solid rgba(56, 189, 248, 0.3)" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#38bdf8", fontWeight: 700 }}>
-                  <Layers className="w-4 h-4" />
-                  REQUIREMENT
+              {activeNode.requirement && (
+                <div style={{ flex: "1 1 200px", padding: "14px", borderRadius: "8px", background: "rgba(56, 189, 248, 0.1)", border: "1px solid rgba(56, 189, 248, 0.3)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#38bdf8", fontWeight: 700 }}>
+                    <Layers className="w-4 h-4" />
+                    REQUIREMENT
+                  </div>
+                  <div style={{ fontWeight: 700, color: "#f8fafc", fontSize: "14px", marginTop: "4px" }}>
+                    {activeNode.requirement.requirementId}
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#94a3b8", marginTop: "2px" }}>
+                    {activeNode.requirement.title}
+                  </div>
+                  <div style={{ marginTop: "6px" }}>
+                    <StatusBadge status={activeNode.requirement.status || "ACTIVE"} size="sm" />
+                  </div>
                 </div>
-                <div style={{ fontWeight: 700, color: "#f8fafc", fontSize: "14px", marginTop: "4px" }}>
-                  {activeNode.requirement?.requirementId}
-                </div>
-                <div style={{ fontSize: "12px", color: "#94a3b8", marginTop: "2px" }}>
-                  {activeNode.requirement?.title}
-                </div>
-                <div style={{ marginTop: "6px" }}>
-                  <StatusBadge status={activeNode.requirement?.status || "ACTIVE"} size="sm" />
-                </div>
-              </div>
+              )}
 
-              <ChevronRight className="w-5 h-5 text-slate-500 flex-shrink-0" />
+              {/* 2. SLO Target(s) */}
+              {activeNode.slos && activeNode.slos.length > 0 && (
+                <>
+                  <ChevronRight className="w-5 h-5 text-slate-500 flex-shrink-0" />
+                  <div style={{ flex: "1 1 200px", padding: "14px", borderRadius: "8px", background: "rgba(245, 158, 11, 0.1)", border: "1px solid rgba(245, 158, 11, 0.3)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#f59e0b", fontWeight: 700 }}>
+                      <Zap className="w-4 h-4" />
+                      SLO TARGET
+                    </div>
+                    <div style={{ fontWeight: 700, color: "#f8fafc", fontSize: "14px", marginTop: "4px" }}>
+                      {activeNode.slos[0].sloId}
+                    </div>
+                    <div style={{ fontSize: "12px", color: "#94a3b8", marginTop: "2px" }}>
+                      {activeNode.slos[0].metric} {activeNode.slos[0].operator || ""} {activeNode.slos[0].threshold} {activeNode.slos[0].unit || ""}
+                    </div>
+                    <div style={{ marginTop: "6px" }}>
+                      <StatusBadge status={activeNode.slos[0].status || "ACTIVE"} size="sm" />
+                    </div>
+                  </div>
+                </>
+              )}
 
-              {/* 2. SLO Target */}
-              <div style={{ flex: 1, padding: "14px", borderRadius: "8px", background: "rgba(245, 158, 11, 0.1)", border: "1px solid rgba(245, 158, 11, 0.3)" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#f59e0b", fontWeight: 700 }}>
-                  <Zap className="w-4 h-4" />
-                  SLO TARGET
-                </div>
-                <div style={{ fontWeight: 700, color: "#f8fafc", fontSize: "14px", marginTop: "4px" }}>
-                  {activeNode.slos?.[0]?.sloId || "SLO-001"}
-                </div>
-                <div style={{ fontSize: "12px", color: "#94a3b8", marginTop: "2px" }}>
-                  {activeNode.slos?.[0]?.metric || "p95_latency"} &lt; {activeNode.slos?.[0]?.threshold || 2.0}s
-                </div>
-                <div style={{ marginTop: "6px" }}>
-                  <StatusBadge status={activeNode.slos?.[0]?.status || "ACTIVE"} size="sm" />
-                </div>
-              </div>
+              {/* 3. Incidents */}
+              {activeNode.incidents && activeNode.incidents.length > 0 && (
+                <>
+                  <ChevronRight className="w-5 h-5 text-slate-500 flex-shrink-0" />
+                  <div style={{ flex: "1 1 200px", padding: "14px", borderRadius: "8px", background: "rgba(139, 92, 246, 0.1)", border: "1px solid rgba(139, 92, 246, 0.3)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#a78bfa", fontWeight: 700 }}>
+                      <BrainCircuit className="w-4 h-4" />
+                      INCIDENT
+                    </div>
+                    <div style={{ fontWeight: 700, color: "#f8fafc", fontSize: "14px", marginTop: "4px" }}>
+                      {activeNode.incidents[0].incidentId}
+                    </div>
+                    <div style={{ fontSize: "12px", color: "#94a3b8", marginTop: "2px" }}>
+                      {activeNode.incidents[0].service} &bull; {activeNode.incidents[0].actualValue != null ? `${activeNode.incidents[0].actualValue}s` : "No measurement available"} vs {activeNode.incidents[0].threshold != null ? `${activeNode.incidents[0].threshold}s` : "No target defined"}
+                    </div>
+                    <div style={{ marginTop: "6px" }}>
+                      <StatusBadge status={activeNode.incidents[0].status} size="sm" />
+                    </div>
+                  </div>
+                </>
+              )}
 
-              <ChevronRight className="w-5 h-5 text-slate-500 flex-shrink-0" />
+              {/* 4. RCA Node */}
+              {activeNode.rcas && activeNode.rcas.length > 0 && (
+                <>
+                  <ChevronRight className="w-5 h-5 text-slate-500 flex-shrink-0" />
+                  <div style={{ flex: "1 1 200px", padding: "14px", borderRadius: "8px", background: "rgba(168, 85, 247, 0.1)", border: "1px solid rgba(168, 85, 247, 0.3)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#c084fc", fontWeight: 700 }}>
+                      <Sparkles className="w-4 h-4" />
+                      ROOT CAUSE ANALYSIS
+                    </div>
+                    <div style={{ fontWeight: 700, color: "#f8fafc", fontSize: "14px", marginTop: "4px" }}>
+                      {activeNode.rcas[0].rcaId}
+                    </div>
+                    <div style={{ fontSize: "12px", color: "#94a3b8", marginTop: "2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {activeNode.rcas[0].rootCause}
+                    </div>
+                    <div style={{ marginTop: "6px" }}>
+                      <StatusBadge status={activeNode.rcas[0].status || "GENERATED"} size="sm" />
+                    </div>
+                  </div>
+                </>
+              )}
 
-              {/* 3. ML Risk Forecast */}
-              <div style={{ flex: 1, padding: "14px", borderRadius: "8px", background: "rgba(139, 92, 246, 0.1)", border: "1px solid rgba(139, 92, 246, 0.3)" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#a78bfa", fontWeight: 700 }}>
-                  <BrainCircuit className="w-4 h-4" />
-                  ML RISK
-                </div>
-                <div style={{ fontWeight: 700, color: "#f8fafc", fontSize: "14px", marginTop: "4px" }}>
-                  {activeNode.incidents?.[0] ? "VIOLATION" : "NO_VIOLATION"}
-                </div>
-                <div style={{ fontSize: "12px", color: "#94a3b8", marginTop: "2px" }}>
-                  Logistic Regression
-                </div>
-                <div style={{ marginTop: "6px" }}>
-                  <StatusBadge status={activeNode.incidents?.[0] ? "VIOLATION" : "NO_VIOLATION"} size="sm" />
-                </div>
-              </div>
+              {/* 5. DevOps Action */}
+              {activeNode.devopsActions && activeNode.devopsActions.length > 0 && (
+                <>
+                  <ChevronRight className="w-5 h-5 text-slate-500 flex-shrink-0" />
+                  <div style={{ flex: "1 1 200px", padding: "14px", borderRadius: "8px", background: "rgba(16, 185, 129, 0.1)", border: "1px solid rgba(16, 185, 129, 0.3)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#34d399", fontWeight: 700 }}>
+                      <ShieldCheck className="w-4 h-4" />
+                      DEVOPS ACTION
+                    </div>
+                    <div style={{ fontWeight: 700, color: "#f8fafc", fontSize: "14px", marginTop: "4px" }}>
+                      {activeNode.devopsActions[0].actionType}
+                    </div>
+                    <div style={{ fontSize: "12px", color: "#94a3b8", marginTop: "2px" }}>
+                      {activeNode.devopsActions[0].actionId}
+                    </div>
+                    <div style={{ marginTop: "6px" }}>
+                      <StatusBadge status={activeNode.devopsActions[0].status} size="sm" />
+                    </div>
+                  </div>
+                </>
+              )}
 
-              <ChevronRight className="w-5 h-5 text-slate-500 flex-shrink-0" />
-
-              {/* 4. Gemini RCA */}
-              <div style={{ flex: 1, padding: "14px", borderRadius: "8px", background: "rgba(168, 85, 247, 0.1)", border: "1px solid rgba(168, 85, 247, 0.3)" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#c084fc", fontWeight: 700 }}>
-                  <Sparkles className="w-4 h-4" />
-                  GEMINI RCA
-                </div>
-                <div style={{ fontWeight: 700, color: "#f8fafc", fontSize: "14px", marginTop: "4px" }}>
-                  {activeNode.rcas?.[0]?.rcaId || "RCA-GEN"}
-                </div>
-                <div style={{ fontSize: "12px", color: "#94a3b8", marginTop: "2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {activeNode.rcas?.[0]?.rootCause || "Pool Exhaustion"}
-                </div>
-                <div style={{ marginTop: "6px" }}>
-                  <StatusBadge status={activeNode.rcas?.[0] ? "RESOLVED" : "PENDING"} size="sm" />
-                </div>
-              </div>
-
-              <ChevronRight className="w-5 h-5 text-slate-500 flex-shrink-0" />
-
-              {/* 5. Experiment & DevOps Action */}
-              <div style={{ flex: 1, padding: "14px", borderRadius: "8px", background: "rgba(16, 185, 129, 0.1)", border: "1px solid rgba(16, 185, 129, 0.3)" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#34d399", fontWeight: 700 }}>
-                  <ShieldCheck className="w-4 h-4" />
-                  DEVOPS ACTION
-                </div>
-                <div style={{ fontWeight: 700, color: "#f8fafc", fontSize: "14px", marginTop: "4px" }}>
-                  {activeNode.devopsActions?.[0]?.actionType || "UPDATE_CONFIG"}
-                </div>
-                <div style={{ fontSize: "12px", color: "#94a3b8", marginTop: "2px" }}>
-                  Safety Gate Approved
-                </div>
-                <div style={{ marginTop: "6px" }}>
-                  <StatusBadge status={activeNode.devopsActions?.[0]?.status || "EXECUTED"} size="sm" />
-                </div>
-              </div>
+              {/* Indicator if no downstream relationships exist */}
+              {(!activeNode.slos || activeNode.slos.length === 0) &&
+                (!activeNode.incidents || activeNode.incidents.length === 0) &&
+                (!activeNode.rcas || activeNode.rcas.length === 0) &&
+                (!activeNode.devopsActions || activeNode.devopsActions.length === 0) && (
+                  <div style={{ color: "#64748b", fontSize: "13px", padding: "14px", fontStyle: "italic" }}>
+                    No downstream SLO, incident, RCA, or DevOps action records linked to this requirement yet.
+                  </div>
+                )}
             </div>
           </div>
 

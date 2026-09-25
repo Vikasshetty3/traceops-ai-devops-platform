@@ -29,17 +29,30 @@ export const IncidentsTab: React.FC<IncidentsTabProps> = ({
   const [mlResult, setMlResult] = useState<MLPredictionData | null>(null);
   const [loadingML, setLoadingML] = useState(false);
 
+  const hasMetrics =
+    selectedIncident?.metrics?.cpuUsage != null &&
+    selectedIncident?.metrics?.memoryUsage != null &&
+    selectedIncident?.metrics?.errorRate != null &&
+    (selectedIncident?.actualValue != null ||
+      selectedIncident?.metrics?.latency != null);
+
   const handleRunML = async (inc: Incident) => {
+    if (
+      inc.metrics?.cpuUsage == null ||
+      inc.metrics?.memoryUsage == null ||
+      inc.metrics?.errorRate == null ||
+      (inc.actualValue == null && inc.metrics?.latency == null)
+    ) {
+      return;
+    }
     setLoadingML(true);
     try {
       const res = await onPredictML({
-        cpuUsage: inc.metrics?.cpuUsage || 88,
-        memoryUsage: inc.metrics?.memoryUsage || 65,
-        errorRate: inc.metrics?.errorRate || 2.0,
-        latency: inc.actualValue || 2.8,
-        requestRate: 1200,
-        dbPoolUsage: 95,
-        deploymentChanged: inc.metrics?.deploymentChanged ? 1 : 0,
+        cpuUsage: inc.metrics.cpuUsage,
+        memoryUsage: inc.metrics.memoryUsage,
+        errorRate: inc.metrics.errorRate,
+        latency: inc.actualValue ?? inc.metrics.latency,
+        deploymentChanged: inc.metrics.deploymentChanged ? 1 : 0,
       });
       setMlResult(res);
     } catch (e) {
@@ -58,7 +71,7 @@ export const IncidentsTab: React.FC<IncidentsTabProps> = ({
 
       {incidents.length === 0 ? (
         <EmptyState
-          title="Zero Active Incidents"
+          title="No incidents recorded"
           description="All telemetry feeds are within established SLO targets."
         />
       ) : (
@@ -187,18 +200,20 @@ export const IncidentsTab: React.FC<IncidentsTabProps> = ({
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "10px", fontSize: "13px" }}>
                 <div style={{ padding: "10px", borderRadius: "6px", background: "rgba(15, 23, 42, 0.8)", border: "1px solid rgba(148, 163, 184, 0.15)" }}>
                   <div style={{ color: "#94a3b8" }}>p95 Latency</div>
-                  <div style={{ fontSize: "16px", fontWeight: 700, color: "#ef4444" }}>{selectedIncident.actualValue}s</div>
+                  <div style={{ fontSize: "16px", fontWeight: 700, color: "#ef4444" }}>
+                    {selectedIncident.actualValue != null ? `${selectedIncident.actualValue}s` : "No measurement available"}
+                  </div>
                 </div>
                 <div style={{ padding: "10px", borderRadius: "6px", background: "rgba(15, 23, 42, 0.8)", border: "1px solid rgba(148, 163, 184, 0.15)" }}>
                   <div style={{ color: "#94a3b8" }}>CPU Load</div>
                   <div style={{ fontSize: "16px", fontWeight: 700, color: "#f8fafc" }}>
-                    {selectedIncident.metrics?.cpuUsage || 88}%
+                    {selectedIncident.metrics?.cpuUsage != null ? `${selectedIncident.metrics.cpuUsage}%` : "No measurement available"}
                   </div>
                 </div>
                 <div style={{ padding: "10px", borderRadius: "6px", background: "rgba(15, 23, 42, 0.8)", border: "1px solid rgba(148, 163, 184, 0.15)" }}>
                   <div style={{ color: "#94a3b8" }}>Memory</div>
                   <div style={{ fontSize: "16px", fontWeight: 700, color: "#f8fafc" }}>
-                    {selectedIncident.metrics?.memoryUsage || 64}%
+                    {selectedIncident.metrics?.memoryUsage != null ? `${selectedIncident.metrics.memoryUsage}%` : "No measurement available"}
                   </div>
                 </div>
               </div>
@@ -225,7 +240,7 @@ export const IncidentsTab: React.FC<IncidentsTabProps> = ({
                   {selectedIncident.logs && selectedIncident.logs.length > 0 ? (
                     selectedIncident.logs.map((log, idx) => <div key={idx}>{log}</div>)
                   ) : (
-                    <div>[LOG] Threshold exceeded on service {selectedIncident.service}</div>
+                    <div style={{ color: "#64748b" }}>No logs recorded for this incident</div>
                   )}
                 </div>
               </div>
@@ -246,17 +261,19 @@ export const IncidentsTab: React.FC<IncidentsTabProps> = ({
                   </div>
                   <button
                     onClick={() => handleRunML(selectedIncident)}
-                    disabled={loadingML}
+                    disabled={loadingML || !hasMetrics}
                     style={{
                       padding: "4px 10px",
                       fontSize: "12px",
                       fontWeight: 600,
-                      backgroundColor: "#3b82f6",
+                      backgroundColor: hasMetrics ? "#3b82f6" : "#475569",
                       color: "#ffffff",
                       border: "none",
                       borderRadius: "4px",
-                      cursor: "pointer",
+                      cursor: hasMetrics ? "pointer" : "not-allowed",
+                      opacity: hasMetrics ? 1 : 0.6,
                     }}
+                    title={!hasMetrics ? "No measurement available" : undefined}
                   >
                     {loadingML ? "Predicting..." : "Run ML Forecast"}
                   </button>
@@ -282,7 +299,9 @@ export const IncidentsTab: React.FC<IncidentsTabProps> = ({
                   </div>
                 ) : (
                   <div style={{ fontSize: "13px", color: "#94a3b8" }}>
-                    Run the research ML classifier to compute violation probability and feature risk decomposition.
+                    {hasMetrics
+                      ? "Run the research ML classifier to compute violation probability and feature risk decomposition."
+                      : "Telemetry measurements not available for ML forecast on this incident."}
                   </div>
                 )}
               </div>

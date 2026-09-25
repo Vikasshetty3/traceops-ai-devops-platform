@@ -107,7 +107,7 @@ export const RemediationTab: React.FC<RemediationTabProps> = ({
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
           {devopsActions.length === 0 ? (
             <EmptyState
-              title="No DevOps Actions Proposed"
+              title="No DevOps actions recorded"
               description="DevOps actions are proposed when root cause analyses and experiment simulations complete."
             />
           ) : (
@@ -154,7 +154,7 @@ export const RemediationTab: React.FC<RemediationTabProps> = ({
                         <StatusBadge status={action.status} size="sm" />
                       </div>
                       <div style={{ fontSize: "13px", color: "#94a3b8" }}>
-                        Target Service: <span style={{ color: "#f8fafc", fontWeight: 600 }}>{action.service}</span> &bull; Requirement: <span style={{ color: "#38bdf8" }}>{action.requirementId || "REQ-001"}</span>
+                        Target Service: <span style={{ color: "#f8fafc", fontWeight: 600 }}>{action.service}</span> &bull; Requirement: <span style={{ color: "#38bdf8" }}>{action.requirementId || "Unassigned"}</span>
                       </div>
                     </div>
 
@@ -377,30 +377,43 @@ export const RemediationTab: React.FC<RemediationTabProps> = ({
 
           {/* Experiment Log History */}
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-            {experiments.map((exp) => (
-              <div
-                key={exp.experimentId}
-                style={{
-                  borderRadius: "8px",
-                  background: "rgba(15, 23, 42, 0.65)",
-                  border: `1px solid ${exp.result === "PASS" ? "rgba(16, 185, 129, 0.3)" : "rgba(239, 68, 68, 0.3)"}`,
-                  padding: "16px",
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                  <div style={{ fontWeight: 600, color: "#f8fafc" }}>{exp.experimentId} - {exp.remediationAction}</div>
-                  <StatusBadge status={exp.result} size="sm" />
+            {experiments.length === 0 ? (
+              <EmptyState
+                title="No experiments recorded"
+                description="Simulate an infrastructure remediation action above to verify expected SLO improvements."
+              />
+            ) : (
+              experiments.map((exp) => (
+                <div
+                  key={exp.experimentId}
+                  style={{
+                    borderRadius: "8px",
+                    background: "rgba(15, 23, 42, 0.65)",
+                    border: `1px solid ${exp.result === "PASS" ? "rgba(16, 185, 129, 0.3)" : "rgba(239, 68, 68, 0.3)"}`,
+                    padding: "16px",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                    <div style={{ fontWeight: 600, color: "#f8fafc" }}>{exp.experimentId} - {exp.remediationAction}</div>
+                    <StatusBadge status={exp.result} size="sm" />
+                  </div>
+                  <div style={{ fontSize: "13px", color: "#94a3b8", marginBottom: "8px" }}>
+                    {exp.hypothesis}
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", fontSize: "12px" }}>
+                    <div>
+                      Before: <span style={{ color: "#ef4444", fontWeight: 700 }}>{exp.metricsBefore?.latency != null ? `${exp.metricsBefore.latency}s` : "No measurement available"}</span>
+                    </div>
+                    <div>
+                      After: <span style={{ color: "#10b981", fontWeight: 700 }}>{exp.metricsAfter?.latency != null ? `${exp.metricsAfter.latency}s` : "No measurement available"}</span>
+                    </div>
+                    <div>
+                      Gain: <span style={{ color: "#38bdf8", fontWeight: 700 }}>{exp.improvementPct != null ? `${exp.improvementPct > 0 ? "+" : ""}${exp.improvementPct}%` : "No measurement available"}</span>
+                    </div>
+                  </div>
                 </div>
-                <div style={{ fontSize: "13px", color: "#94a3b8", marginBottom: "8px" }}>
-                  {exp.hypothesis}
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", fontSize: "12px" }}>
-                  <div>Before: <span style={{ color: "#ef4444", fontWeight: 700 }}>{exp.metricsBefore?.latency}s</span></div>
-                  <div>After: <span style={{ color: "#10b981", fontWeight: 700 }}>{exp.metricsAfter?.latency}s</span></div>
-                  <div>Gain: <span style={{ color: "#38bdf8", fontWeight: 700 }}>+{exp.improvementPct}%</span></div>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       )}

@@ -110,7 +110,7 @@ export const RequirementsTab: React.FC<RequirementsTabProps> = ({
 
       {filtered.length === 0 ? (
         <EmptyState
-          title="No Requirements Found"
+          title="No requirements discovered"
           description="Create your first SLA requirement to bind microservices to verifiable SLO performance contracts."
           action={
             <button
@@ -165,7 +165,13 @@ export const RequirementsTab: React.FC<RequirementsTabProps> = ({
                   </td>
                   <td style={{ padding: "14px 16px", color: "#e2e8f0" }}>{req.service}</td>
                   <td style={{ padding: "14px 16px", fontWeight: 600, color: "#f1f5f9" }}>
-                    {req.metric || "p95_latency"} &lt; {req.threshold || 2.0} {req.unit || "s"}
+                    {req.threshold != null ? (
+                      <>
+                        {req.metric || "Metric unspecified"} &lt; {req.threshold} {req.unit || ""}
+                      </>
+                    ) : (
+                      "No threshold specified"
+                    )}
                   </td>
                   <td style={{ padding: "14px 16px" }}>
                     <StatusBadge status={req.priority} size="sm" />
