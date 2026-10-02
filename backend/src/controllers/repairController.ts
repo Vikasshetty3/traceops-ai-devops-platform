@@ -13,6 +13,7 @@ import { ProjectStorageService } from "../services/projectStorageService";
 import { RcaRepairContractService } from "../services/rcaRepairContractService";
 import { DeploymentLockConflictError } from "../services/deploymentLockService";
 import { PostDeploymentVerificationService } from "../services/postDeploymentVerificationService";
+import { DeploymentAuditService } from "../services/deploymentAuditService";
 
 /**
  * Trigger static issue detection scan on a project
@@ -710,4 +711,72 @@ export const verifyRepairEvidence = async (req: Request, res: Response): Promise
     });
   }
 };
+
+/**
+ * Phase 5.3 Batch C1 — Cryptographic Deployment Audit Logging
+ * Returns complete, chronological, cryptographically verified audit events for a deployment.
+ * Endpoint: GET /api/deployments/:deploymentId/audit-events
+ */
+export const getDeploymentAuditEvents = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const deploymentId = String(req.params.deploymentId || req.params.id);
+    const deployment = await Deployment.findOne({ deploymentId });
+    if (!deployment) {
+      res.status(404).json({
+        success: false,
+        message: `Deployment not found for deploymentId: ${deploymentId}`,
+      });
+      return;
+    }
+
+    const events = await DeploymentAuditService.getDeploymentEvents(deploymentId);
+    const verification = await DeploymentAuditService.verifyChain(deploymentId);
+
+    res.status(200).json({
+      success: true,
+      deploymentId,
+      chainValid: verification.valid,
+      eventsCount: events.length,
+      events,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+};
+
+/**
+ * Phase 5.3 Batch C1 — Cryptographic Audit Chain Verification
+ * Verifies SHA-256 hash chaining, sequential continuity, and payload integrity.
+ * Endpoint: GET /api/deployments/:deploymentId/audit-events/verify
+ */
+export const verifyDeploymentAuditChain = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const deploymentId = String(req.params.deploymentId || req.params.id);
+    const deployment = await Deployment.findOne({ deploymentId });
+    if (!deployment) {
+      res.status(404).json({
+        success: false,
+        message: `Deployment not found for deploymentId: ${deploymentId}`,
+      });
+      return;
+    }
+
+    const verification = await DeploymentAuditService.verifyChain(deploymentId);
+
+    res.status(verification.valid ? 200 : 400).json({
+      success: verification.valid,
+      deploymentId,
+      verification,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+};
+
 

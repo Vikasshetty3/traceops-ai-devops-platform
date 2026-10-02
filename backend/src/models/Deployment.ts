@@ -50,6 +50,9 @@ export interface IDeployment extends Document {
   rollbackVerificationStatus?: "HEALTHY" | "BREACHED" | "UNAVAILABLE" | "PENDING";
   rollbackTelemetryEvidence?: any[];
 
+  // Phase 5.3 Batch C: Cryptographic Audit Logging
+  lastAuditEventId?: string;
+
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -138,6 +141,8 @@ const deploymentSchema = new Schema<IDeployment>(
       enum: ["HEALTHY", "BREACHED", "UNAVAILABLE", "PENDING"],
     },
     rollbackTelemetryEvidence: [{ type: Schema.Types.Mixed }],
+    // Phase 5.3 Batch C: Cryptographic Audit Logging
+    lastAuditEventId: { type: String, trim: true },
   },
   {
     timestamps: true,

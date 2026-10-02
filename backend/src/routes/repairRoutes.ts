@@ -19,6 +19,8 @@ import {
   createIncidentRepair,
   verifyRepairEvidence,
   verifyDeploymentSLO,
+  getDeploymentAuditEvents,
+  verifyDeploymentAuditChain,
 } from "../controllers/repairController";
 
 const router = Router();
@@ -53,5 +55,9 @@ router.get("/deployments/:deploymentId/verify", getDeploymentById);
 router.post("/deployments/:deploymentId/verify", verifyDeploymentSLO);
 router.get("/deployments/:deploymentId/probe", probeDeployment);
 router.post("/deployments/:deploymentId/rollback", rollbackDeployment);
+
+// Phase 5.3 Batch C1 — Cryptographic Audit Logging
+router.get("/deployments/:deploymentId/audit-events", getDeploymentAuditEvents);
+router.get("/deployments/:deploymentId/audit-events/verify", verifyDeploymentAuditChain);
 
 export default router;
