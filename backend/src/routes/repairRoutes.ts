@@ -21,6 +21,10 @@ import {
   verifyDeploymentSLO,
   getDeploymentAuditEvents,
   verifyDeploymentAuditChain,
+  getDeploymentTraffic,
+  setDeploymentTraffic,
+  advanceDeploymentTraffic,
+  proxyDeploymentGateway,
 } from "../controllers/repairController";
 
 const router = Router();
@@ -59,5 +63,11 @@ router.post("/deployments/:deploymentId/rollback", rollbackDeployment);
 // Phase 5.3 Batch C1 — Cryptographic Audit Logging
 router.get("/deployments/:deploymentId/audit-events", getDeploymentAuditEvents);
 router.get("/deployments/:deploymentId/audit-events/verify", verifyDeploymentAuditChain);
+
+// Phase 5.3 Batch C2 — Dynamic Traffic Routing Subsystem
+router.get("/deployments/:deploymentId/traffic", getDeploymentTraffic);
+router.post("/deployments/:deploymentId/traffic", setDeploymentTraffic);
+router.post("/deployments/:deploymentId/traffic/advance", advanceDeploymentTraffic);
+router.use("/deployments/:deploymentId/gateway", proxyDeploymentGateway);
 
 export default router;

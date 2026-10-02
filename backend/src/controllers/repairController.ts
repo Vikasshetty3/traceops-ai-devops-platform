@@ -14,6 +14,7 @@ import { RcaRepairContractService } from "../services/rcaRepairContractService";
 import { DeploymentLockConflictError } from "../services/deploymentLockService";
 import { PostDeploymentVerificationService } from "../services/postDeploymentVerificationService";
 import { DeploymentAuditService } from "../services/deploymentAuditService";
+import { TrafficRoutingService } from "../services/trafficRoutingService";
 
 /**
  * Trigger static issue detection scan on a project
@@ -778,5 +779,193 @@ export const verifyDeploymentAuditChain = async (req: Request, res: Response): P
     });
   }
 };
+
+/**
+ * Phase 5.3 Batch C2 — Dynamic Traffic Routing Subsystem
+ * Retrieves current traffic state, active weights, container targets, and request counts.
+ * Endpoint: GET /api/deployments/:deploymentId/traffic
+ */
+export const getDeploymentTraffic = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const deploymentId = String(req.params.deploymentId || req.params.id);
+    const deployment = await Deployment.findOne({ deploymentId });
+    if (!deployment) {
+      res.status(404).json({
+        success: false,
+        message: `Deployment not found for deploymentId: ${deploymentId}`,
+      });
+      return;
+    }
+
+    const route = await TrafficRoutingService.getTrafficState(deploymentId);
+
+    res.status(200).json({
+      success: true,
+      deploymentId: route.deploymentId,
+      strategy: route.strategy,
+      currentStage: route.stage,
+      candidateWeight: route.candidateWeight,
+      predecessorWeight: route.predecessorWeight,
+      candidateContainer: route.candidateContainer,
+      predecessorContainer: route.predecessorContainer,
+      candidateHostPort: route.candidateHostPort,
+      predecessorHostPort: route.predecessorHostPort,
+      candidateTargetUrl: route.candidateTargetUrl,
+      predecessorTargetUrl: route.predecessorTargetUrl,
+      ingressPort: route.ingressPort,
+      totalRequests: route.totalRequests,
+      candidateRequests: route.candidateRequests,
+      predecessorRequests: route.predecessorRequests,
+      active: true,
+    });
+  } catch (error: any) {
+    const message = error instanceof Error ? error.message : String(error);
+    const statusCode = message.includes("not found") ? 404 : 500;
+    res.status(statusCode).json({
+      success: false,
+      message,
+    });
+  }
+};
+
+/**
+ * Phase 5.3 Batch C2 — Explicit Traffic Weight Configuration
+ * Sets dynamic traffic weights between predecessor and candidate containers.
+ * Endpoint: POST /api/deployments/:deploymentId/traffic
+ */
+export const setDeploymentTraffic = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const deploymentId = String(req.params.deploymentId || req.params.id);
+    const { candidateWeight, predecessorWeight, stage, reason, actor } = req.body || {};
+
+    if (candidateWeight === undefined || predecessorWeight === undefined) {
+      res.status(400).json({
+        success: false,
+        message: "Missing required parameters: candidateWeight and predecessorWeight are required",
+      });
+      return;
+    }
+
+    const route = await TrafficRoutingService.setTrafficWeights({
+      deploymentId,
+      candidateWeight: Number(candidateWeight),
+      predecessorWeight: Number(predecessorWeight),
+      stage: stage || `TIER_${candidateWeight}`,
+      reason,
+      actor: actor || (req.headers["x-user-id"] as string) || "DevOps Engineer",
+    });
+
+    res.status(200).json({
+      success: true,
+      deploymentId: route.deploymentId,
+      strategy: route.strategy,
+      currentStage: route.stage,
+      candidateWeight: route.candidateWeight,
+      predecessorWeight: route.predecessorWeight,
+      candidateContainer: route.candidateContainer,
+      predecessorContainer: route.predecessorContainer,
+      candidateHostPort: route.candidateHostPort,
+      predecessorHostPort: route.predecessorHostPort,
+      ingressPort: route.ingressPort,
+      message: `Traffic shifted to ${route.candidateWeight}% candidate / ${route.predecessorWeight}% predecessor`,
+    });
+  } catch (error: any) {
+    const message = error instanceof Error ? error.message : String(error);
+    const isConflict = error instanceof DeploymentLockConflictError || message.includes("DeploymentLockConflict");
+    const isNotFound = message.includes("not found");
+    const isValidation =
+      message.includes("Invariant Violation") ||
+      message.includes("Safety Gate") ||
+      message.includes("Strategy Violation");
+
+    const statusCode = isConflict ? 409 : isNotFound ? 404 : isValidation ? 400 : 500;
+
+    res.status(statusCode).json({
+      success: false,
+      message,
+      error: message,
+    });
+  }
+};
+
+/**
+ * Phase 5.3 Batch C2 — Traffic Advance Primitive
+ * Explicitly transitions traffic to target weight.
+ * Endpoint: POST /api/deployments/:deploymentId/traffic/advance
+ */
+export const advanceDeploymentTraffic = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const deploymentId = String(req.params.deploymentId || req.params.id);
+    const { targetWeight, stage, reason, actor } = req.body || {};
+
+    if (targetWeight === undefined || typeof targetWeight !== "number") {
+      res.status(400).json({
+        success: false,
+        message: "targetWeight is required and must be a number between 0 and 100",
+      });
+      return;
+    }
+
+    const candidateWeight = Number(targetWeight);
+    const predecessorWeight = 100 - candidateWeight;
+
+    const route = await TrafficRoutingService.setTrafficWeights({
+      deploymentId,
+      candidateWeight,
+      predecessorWeight,
+      stage: stage || `TIER_${candidateWeight}`,
+      reason: reason || `Advanced to tier ${candidateWeight}%`,
+      actor: actor || (req.headers["x-user-id"] as string) || "DevOps Engineer",
+    });
+
+    res.status(200).json({
+      success: true,
+      deploymentId: route.deploymentId,
+      strategy: route.strategy,
+      currentStage: route.stage,
+      candidateWeight: route.candidateWeight,
+      predecessorWeight: route.predecessorWeight,
+      candidateContainer: route.candidateContainer,
+      predecessorContainer: route.predecessorContainer,
+      message: `Traffic successfully advanced to ${candidateWeight}% candidate`,
+    });
+  } catch (error: any) {
+    const message = error instanceof Error ? error.message : String(error);
+    const isConflict = error instanceof DeploymentLockConflictError || message.includes("DeploymentLockConflict");
+    const isNotFound = message.includes("not found");
+    const isValidation =
+      message.includes("Invariant Violation") ||
+      message.includes("Safety Gate") ||
+      message.includes("Strategy Violation");
+
+    const statusCode = isConflict ? 409 : isNotFound ? 404 : isValidation ? 400 : 500;
+
+    res.status(statusCode).json({
+      success: false,
+      message,
+      error: message,
+    });
+  }
+};
+
+/**
+ * Phase 5.3 Batch C2 — Gateway HTTP Proxy
+ * Dispatches live incoming requests to either candidate or predecessor according to active weights.
+ * Endpoint: ALL /api/deployments/:deploymentId/gateway*
+ */
+export const proxyDeploymentGateway = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const deploymentId = String(req.params.deploymentId || req.params.id);
+    await TrafficRoutingService.dispatchRequest(deploymentId, req, res);
+  } catch (error: any) {
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+};
+
 
 

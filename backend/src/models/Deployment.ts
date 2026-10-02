@@ -50,8 +50,21 @@ export interface IDeployment extends Document {
   rollbackVerificationStatus?: "HEALTHY" | "BREACHED" | "UNAVAILABLE" | "PENDING";
   rollbackTelemetryEvidence?: any[];
 
-  // Phase 5.3 Batch C: Cryptographic Audit Logging
+  // Phase 5.3 Batch C: Cryptographic Audit Logging & Traffic Routing
   lastAuditEventId?: string;
+  trafficStrategy?: "CANARY" | "BLUE_GREEN" | "DIRECT";
+  candidateTrafficWeight?: number;
+  predecessorTrafficWeight?: number;
+  currentCanaryStage?: string;
+  canaryStages?: Array<{
+    stage: string;
+    candidateWeight: number;
+    predecessorWeight: number;
+    enteredAt: Date;
+    completedAt?: Date;
+    status: string;
+    reason?: string;
+  }>;
 
   createdAt?: Date;
   updatedAt?: Date;
@@ -141,8 +154,27 @@ const deploymentSchema = new Schema<IDeployment>(
       enum: ["HEALTHY", "BREACHED", "UNAVAILABLE", "PENDING"],
     },
     rollbackTelemetryEvidence: [{ type: Schema.Types.Mixed }],
-    // Phase 5.3 Batch C: Cryptographic Audit Logging
+    // Phase 5.3 Batch C: Cryptographic Audit Logging & Traffic Routing
     lastAuditEventId: { type: String, trim: true },
+    trafficStrategy: {
+      type: String,
+      enum: ["CANARY", "BLUE_GREEN", "DIRECT"],
+      default: "CANARY",
+    },
+    candidateTrafficWeight: { type: Number, default: 0, min: 0, max: 100 },
+    predecessorTrafficWeight: { type: Number, default: 100, min: 0, max: 100 },
+    currentCanaryStage: { type: String, trim: true },
+    canaryStages: [
+      {
+        stage: { type: String, required: true },
+        candidateWeight: { type: Number, required: true },
+        predecessorWeight: { type: Number, required: true },
+        enteredAt: { type: Date, default: Date.now },
+        completedAt: { type: Date },
+        status: { type: String },
+        reason: { type: String },
+      },
+    ],
   },
   {
     timestamps: true,
