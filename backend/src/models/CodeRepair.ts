@@ -62,6 +62,25 @@ export interface ICodeRepair extends Document {
     | "UNSUPPORTED_REPAIR_ACTION";
   evidenceReferences?: string[];
 
+  // Phase 5.3 Batch A: Git Worktree & Commit Provenance
+  baseRepository?: string;
+  baseCommitSha?: string;
+  branchName?: string;
+  candidateCommitSha?: string;
+  author?: string;
+  gitProvenanceTrace?: {
+    baseCommitSha?: string;
+    candidateCommitSha?: string;
+    branchName?: string;
+    repairId?: string;
+    incidentId?: string;
+    rcaId?: string;
+    sloId?: string;
+    requirementId?: string;
+    evidenceSnapshotHash?: string;
+    committedAt?: Date;
+  };
+
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -215,6 +234,13 @@ const codeRepairSchema = new Schema<ICodeRepair>(
       ],
     },
     evidenceReferences: [{ type: String }],
+    // Phase 5.3 Batch A: Git Worktree & Commit Provenance
+    baseRepository: { type: String, trim: true },
+    baseCommitSha: { type: String, trim: true },
+    branchName: { type: String, trim: true },
+    candidateCommitSha: { type: String, trim: true, index: true },
+    author: { type: String, trim: true },
+    gitProvenanceTrace: { type: Schema.Types.Mixed },
   },
   {
     timestamps: true,

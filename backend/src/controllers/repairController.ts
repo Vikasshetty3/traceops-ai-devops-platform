@@ -11,6 +11,7 @@ import { ValidationService } from "../services/validationService";
 import { DockerDeploymentProvider } from "../services/dockerDeploymentProvider";
 import { ProjectStorageService } from "../services/projectStorageService";
 import { RcaRepairContractService } from "../services/rcaRepairContractService";
+import { DeploymentLockConflictError } from "../services/deploymentLockService";
 
 /**
  * Trigger static issue detection scan on a project
@@ -331,16 +332,24 @@ export const deployRepair = async (req: Request, res: Response): Promise<void> =
     });
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
+    const isLockConflict =
+      error instanceof DeploymentLockConflictError ||
+      errorMsg.includes("Deployment Lock Conflict") ||
+      errorMsg.includes("deployment lock held");
     const isSafetyGate =
       errorMsg.includes("Safety Gate") ||
       errorMsg.includes("Approval Required") ||
       errorMsg.includes("not approved") ||
       errorMsg.includes("must be approved") ||
-      errorMsg.includes("blocked");
+      errorMsg.includes("blocked") ||
+      errorMsg.includes("Missing Git candidate commit") ||
+      errorMsg.includes("foreign key links");
 
-    res.status(isSafetyGate ? 400 : 500).json({
+    const status = isLockConflict ? 409 : (isSafetyGate ? 400 : 500);
+
+    res.status(status).json({
       success: false,
-      message: isSafetyGate ? errorMsg : "Deployment failed",
+      message: (isSafetyGate || isLockConflict) ? errorMsg : "Deployment failed",
       error: errorMsg,
     });
   }

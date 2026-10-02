@@ -11,6 +11,7 @@ import { CodeIssue } from "../models/CodeIssue";
 import { Traceability, ITraceability } from "../models/Traceability";
 import { ProjectStorageService } from "./projectStorageService";
 import { CodeRepairService } from "./codeRepairService";
+import { GitProvenanceService } from "./gitProvenanceService";
 
 export type BoundedRepairActionType =
   | "MISSING_TIMEOUT"
@@ -661,11 +662,12 @@ export class RcaRepairContractService {
       }
     }
 
-    // Create isolated sandbox workspace from project source
-    const workspaceDir = ProjectStorageService.createRepairWorkspace(
-      repairId,
-      project.projectId
-    );
+    // Create isolated Git worktree from base repository
+    const { worktreePath: workspaceDir, branchName, baseCommitSha, baseRepository } =
+      await GitProvenanceService.createRepairWorktree(
+        repairId,
+        project.projectId
+      );
 
     const targetFilePath = ProjectStorageService.safeResolvePath(
       workspaceDir,
@@ -720,6 +722,19 @@ export class RcaRepairContractService {
       patchedContent
     );
 
+    // Commit candidate changes to Git worktree branch with traceability trailers
+    const { candidateCommitSha } = await GitProvenanceService.commitCandidate({
+      worktreePath: workspaceDir,
+      repairId,
+      incidentId: incident.incidentId,
+      rcaId: rca.rcaId,
+      sloId: slo.sloId,
+      requirementId: requirement.requirementId,
+      evidenceSnapshotHash: snapshotPkg.hash,
+      candidateActionType: actionMapping.candidateActionType,
+      changedFiles: [targetFileName],
+    });
+
     // Create CodeRepair record preserving full traceability & provenance
     const codeRepair = await CodeRepair.create({
       repairId,
@@ -753,6 +768,26 @@ export class RcaRepairContractService {
       candidateAction: actionMapping.candidateAction,
       candidateActionType: actionMapping.candidateActionType,
       evidenceReferences: rca.evidence || [],
+
+      // Phase 5.3 Batch A Git Provenance fields
+      baseRepository,
+      baseCommitSha,
+      branchName,
+      candidateCommitSha,
+      author: "TraceOps Autonomous Repair Engine <traceops-agent@deepmind.google.com>",
+      gitProvenanceTrace: {
+        baseRepository,
+        baseCommitSha,
+        branchName,
+        candidateCommitSha,
+        repairId,
+        incidentId: incident.incidentId,
+        rcaId: rca.rcaId,
+        sloId: slo.sloId,
+        requirementId: requirement.requirementId,
+        evidenceSnapshotHash: snapshotPkg.hash,
+        committedAt: new Date(),
+      },
     });
 
     // Create end-to-end Traceability record

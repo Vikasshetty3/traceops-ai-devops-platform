@@ -19,6 +19,15 @@ export interface IDeployment extends Document {
   rolledBackAt?: Date;
   rollbackReason?: string;
   previousDeploymentId?: string;
+
+  // Phase 5.3 Batch A: Candidate & Predecessor Provenance
+  candidateCommitSha?: string;
+  candidateImage?: string;
+  candidateContainer?: string;
+  predecessorImage?: string;
+  predecessorContainer?: string;
+  lockId?: string;
+
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -72,6 +81,13 @@ const deploymentSchema = new Schema<IDeployment>(
     rolledBackAt: { type: Date },
     rollbackReason: { type: String },
     previousDeploymentId: { type: String },
+    // Phase 5.3 Batch A: Candidate & Predecessor Provenance
+    candidateCommitSha: { type: String, trim: true, index: true },
+    candidateImage: { type: String, trim: true },
+    candidateContainer: { type: String, trim: true },
+    predecessorImage: { type: String, trim: true },
+    predecessorContainer: { type: String, trim: true },
+    lockId: { type: String, trim: true },
   },
   {
     timestamps: true,

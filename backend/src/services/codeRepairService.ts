@@ -4,6 +4,7 @@ import { CodeIssue, ICodeIssue } from "../models/CodeIssue";
 import { CodeRepair, ICodeRepair } from "../models/CodeRepair";
 import { ProjectStorageService } from "./projectStorageService";
 import { ProjectRuntimeInspector } from "./projectRuntimeInspector";
+import { GitProvenanceService } from "./gitProvenanceService";
 
 export class CodeRepairService {
   /**
@@ -17,11 +18,12 @@ export class CodeRepairService {
 
     const repairId = `REP-${Date.now().toString().slice(-6)}`;
 
-    // 1. Create isolated sandbox workspace from project source
-    const workspaceDir = ProjectStorageService.createRepairWorkspace(
-      repairId,
-      issue.projectId
-    );
+    // 1. Create isolated Git worktree from base repository
+    const { worktreePath: workspaceDir, branchName, baseCommitSha, baseRepository } =
+      await GitProvenanceService.createRepairWorktree(
+        repairId,
+        issue.projectId
+      );
 
     // 2. Safely resolve target file inside workspace
     const targetFilePath = ProjectStorageService.safeResolvePath(
@@ -53,11 +55,19 @@ export class CodeRepairService {
       patchedContent
     );
 
-    // 5. Update issue status
+    // 5. Commit candidate changes to Git worktree branch with traceability trailers
+    const { candidateCommitSha } = await GitProvenanceService.commitCandidate({
+      worktreePath: workspaceDir,
+      repairId,
+      candidateActionType: issue.category,
+      changedFiles: [issue.file],
+    });
+
+    // 6. Update issue status
     issue.status = "REPAIRING";
     await issue.save();
 
-    // 6. Create CodeRepair record in MongoDB
+    // 7. Create CodeRepair record in MongoDB
     const codeRepair = await CodeRepair.create({
       repairId,
       issueId: issue.issueId,
@@ -75,6 +85,20 @@ export class CodeRepairService {
       approvalStatus: "PENDING",
       beforeHashes: { [issue.file]: beforeHash },
       afterHashes: { [issue.file]: afterHash },
+      // Phase 5.3 Batch A Git Provenance fields
+      baseRepository,
+      baseCommitSha,
+      branchName,
+      candidateCommitSha,
+      author: "TraceOps Autonomous Repair Engine <traceops-agent@deepmind.google.com>",
+      gitProvenanceTrace: {
+        baseRepository,
+        baseCommitSha,
+        branchName,
+        candidateCommitSha,
+        repairId,
+        committedAt: new Date(),
+      },
     });
 
     return codeRepair;
@@ -83,7 +107,7 @@ export class CodeRepairService {
   /**
    * Deterministically synthesizes minimal fix based on issue category and code context.
    */
-  private static applyPatchToContent(
+  public static applyPatchToContent(
     content: string,
     issue: ICodeIssue,
     workspaceDir?: string
