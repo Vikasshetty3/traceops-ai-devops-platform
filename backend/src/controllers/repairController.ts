@@ -12,6 +12,7 @@ import { DockerDeploymentProvider } from "../services/dockerDeploymentProvider";
 import { ProjectStorageService } from "../services/projectStorageService";
 import { RcaRepairContractService } from "../services/rcaRepairContractService";
 import { DeploymentLockConflictError } from "../services/deploymentLockService";
+import { PostDeploymentVerificationService } from "../services/postDeploymentVerificationService";
 
 /**
  * Trigger static issue detection scan on a project
@@ -393,12 +394,12 @@ export const getDeploymentById = async (req: Request, res: Response): Promise<vo
 };
 
 /**
- * Rollback a deployment
+ * Rollback a deployment (Phase 5.3 Batch B: Automated Predecessor Restoration & Prometheus Verification)
  */
 export const rollbackDeployment = async (req: Request, res: Response): Promise<void> => {
   try {
     const deploymentId = String(req.params.deploymentId);
-    const { reason } = req.body;
+    const { reason } = req.body || {};
 
     const query = mongoose.isValidObjectId(deploymentId)
       ? { $or: [{ deploymentId }, { _id: deploymentId }] }
@@ -409,23 +410,64 @@ export const rollbackDeployment = async (req: Request, res: Response): Promise<v
       return;
     }
 
-    await DockerDeploymentProvider.executeRollback(
-      deployment,
-      deployment.containerName || `traceops-live-${deployment.projectId}-${deployment.repairId}`,
+    const outcome = await PostDeploymentVerificationService.executeRollback(
+      deployment.deploymentId,
       reason || "Manual rollback requested by operator"
     );
 
-    res.status(200).json({
-      success: true,
-      message: `Deployment ${deployment.deploymentId} rolled back successfully`,
-      deployment,
-      data: deployment,
+    res.status(outcome.success ? 200 : 500).json({
+      success: outcome.success,
+      message: outcome.success
+        ? `Deployment ${deployment.deploymentId} rolled back successfully`
+        : `Deployment rollback failed: ${outcome.reason}`,
+      deployment: outcome.deployment,
+      outcome,
+      data: outcome.deployment,
     });
   } catch (error) {
     res.status(500).json({
       success: false,
       message: "Failed to rollback deployment",
       error: error instanceof Error ? error.message : error,
+    });
+  }
+};
+
+/**
+ * Phase 5.3 Batch B — Trigger or re-run closed-loop Prometheus SLO verification on a deployment
+ * Endpoint: POST /api/deployments/:deploymentId/verify
+ */
+export const verifyDeploymentSLO = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const deploymentId = String(req.params.deploymentId);
+    const { stabilizationWindowSeconds, forcedPromQl, autoRollbackOnBreach, timeoutMs } = req.body || {};
+
+    const outcome = await PostDeploymentVerificationService.verifyDeployment(deploymentId, {
+      stabilizationWindowSeconds: stabilizationWindowSeconds ? Number(stabilizationWindowSeconds) : undefined,
+      forcedPromQl,
+      autoRollbackOnBreach: autoRollbackOnBreach !== undefined ? Boolean(autoRollbackOnBreach) : true,
+      timeoutMs: timeoutMs ? Number(timeoutMs) : undefined,
+    });
+
+    res.status(200).json({
+      success: outcome.status === "HEALTHY",
+      status: outcome.status,
+      verification: outcome.verification,
+      deployment: outcome.deployment,
+      actualValue: outcome.actualValue,
+      target: outcome.target,
+      operator: outcome.operator,
+      promQl: outcome.promQl,
+      samples: outcome.samples,
+      data: outcome,
+    });
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    const isSafetyGate = errorMsg.includes("Safety Gate") || errorMsg.includes("not found");
+    res.status(isSafetyGate ? 400 : 500).json({
+      success: false,
+      message: errorMsg,
+      error: errorMsg,
     });
   }
 };

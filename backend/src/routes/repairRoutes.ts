@@ -18,6 +18,7 @@ import {
   downloadLatestRepairedProject,
   createIncidentRepair,
   verifyRepairEvidence,
+  verifyDeploymentSLO,
 } from "../controllers/repairController";
 
 const router = Router();
@@ -49,6 +50,7 @@ router.get("/repairs/:repairId/download", downloadRepairedProject);
 // Deployments & Rollback
 router.get("/deployments/:deploymentId", getDeploymentById);
 router.get("/deployments/:deploymentId/verify", getDeploymentById);
+router.post("/deployments/:deploymentId/verify", verifyDeploymentSLO);
 router.get("/deployments/:deploymentId/probe", probeDeployment);
 router.post("/deployments/:deploymentId/rollback", rollbackDeployment);
 

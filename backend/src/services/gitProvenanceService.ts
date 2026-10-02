@@ -38,6 +38,10 @@ export class GitProvenanceService {
       "commit.gpgSign=false",
       "-c",
       "core.autocrlf=false",
+      "-c",
+      "user.name=TraceOps Autonomous Repair Engine",
+      "-c",
+      "user.email=traceops-agent@deepmind.google.com",
       ...args,
     ];
 
@@ -49,12 +53,19 @@ export class GitProvenanceService {
           GIT_TERMINAL_PROMPT: "0",
           GIT_ASKPASS: "",
           SSH_ASKPASS: "",
+          GIT_COMMITTER_NAME: "TraceOps Autonomous Repair Engine",
+          GIT_COMMITTER_EMAIL: "traceops-agent@deepmind.google.com",
+          GIT_AUTHOR_NAME: "TraceOps Autonomous Repair Engine",
+          GIT_AUTHOR_EMAIL: "traceops-agent@deepmind.google.com",
         },
         maxBuffer: 10 * 1024 * 1024,
       });
       return { stdout: res.stdout.trim(), stderr: res.stderr.trim() };
     } catch (err: any) {
-      throw new Error(`Git Execution Error (${args.join(" ")}): ${err.message || err}`);
+      const stderr = err.stderr ? err.stderr.toString().trim() : "";
+      const stdout = err.stdout ? err.stdout.toString().trim() : "";
+      const extra = [stderr, stdout].filter(Boolean).join(" | ");
+      throw new Error(`Git Execution Error (${args.join(" ")}): ${err.message}${extra ? ` | Details: ${extra}` : ""}`);
     }
   }
 
@@ -198,7 +209,7 @@ Autonomous-Agent: TraceOps-Phase-5.3`;
 
     // 3. Commit to worktree branch without running external hooks
     await this.runGit(
-      ["commit", "--no-verify", `--author=${author}`, "-m", commitMessage],
+      ["commit", "--allow-empty", "--no-verify", `--author=${author}`, "-m", commitMessage],
       worktreePath
     );
 

@@ -66,13 +66,13 @@ async function runTests() {
   // Setup: Find or seed baseline active SLO and Requirement
   const slosRes = await api("/api/slos");
   const slos = slosRes.data?.data || slosRes.data || [];
-  const baseSlo = slos.find((s) => s.service === "Checkout") || slos[0];
-  assert(Boolean(baseSlo), `Found base SLO in system: ${baseSlo?.sloId || "NONE"} (${baseSlo?.service})`);
-
   const reqsRes = await api("/api/requirements");
   const reqs = reqsRes.data?.data || reqsRes.data || [];
+
+  const baseSlo = slos.find((s) => s.sloId === "SLO-001") || slos.find((s) => s.service === "Checkout") || slos[0];
   const baseReq = reqs.find((r) => r.requirementId === baseSlo?.requirementId) || reqs[0];
-  assert(Boolean(baseReq), `Found base Requirement in system: ${baseReq?.requirementId || "NONE"}`);
+  assert(Boolean(baseSlo), `Found base SLO in system: ${baseSlo?.sloId || "NONE"} (${baseSlo?.service})`);
+  assert(Boolean(baseReq), `Found base Requirement in system: ${baseReq?.requirementId || "NONE"} (${baseReq?.service})`);
 
   // ---------------------------------------------------------------------------
   // TEST 1: Live PROMETHEUS_SLO_MONITOR Incident + Evidence-Backed RCA -> Repair Candidate Created
@@ -146,6 +146,7 @@ async function runTests() {
   const repairContractRes = await api(`/api/incidents/${test1IncId}/repair`, {
     method: "POST",
   });
+  console.log("REPAIR RES STATUS:", repairContractRes.status, "BODY:", JSON.stringify(repairContractRes.data));
   assert(repairContractRes.status === 201, `POST /api/incidents/:id/repair returned 201 Created`);
   assert(repairContractRes.data?.success === true, "Repair response returned success: true");
   assert(repairContractRes.data?.repair?.incidentId === test1IncId, "Repair record links correct incidentId");

@@ -11,7 +11,22 @@ export interface IDeployment extends Document {
   containerName?: string;
   hostPort?: number;
   targetPort?: number;
-  status: "BUILDING" | "DEPLOYING" | "RUNNING" | "HEALTHY" | "FAILED" | "ROLLED_BACK";
+  status:
+    | "BUILDING"
+    | "DEPLOYING"
+    | "DEPLOYED"
+    | "RUNNING"
+    | "VERIFYING"
+    | "HEALTHY"
+    | "STABLE"
+    | "BREACHED"
+    | "ROLLBACK_PENDING"
+    | "ROLLING_BACK"
+    | "VERIFYING_PREDECESSOR"
+    | "ROLLED_BACK_SUCCESSFULLY"
+    | "ROLLBACK_FAILED"
+    | "FAILED"
+    | "ROLLED_BACK";
   healthCheckUrl?: string;
   healthCheckPassed: boolean;
   deploymentLogs: string[];
@@ -27,6 +42,13 @@ export interface IDeployment extends Document {
   predecessorImage?: string;
   predecessorContainer?: string;
   lockId?: string;
+
+  // Phase 5.3 Batch B: Rollback State Machine & Audit
+  rollbackStartedAt?: Date;
+  rollbackCompletedAt?: Date;
+  rollbackStatus?: "ROLLBACK_PENDING" | "ROLLING_BACK" | "ROLLED_BACK_SUCCESSFULLY" | "ROLLBACK_FAILED";
+  rollbackVerificationStatus?: "HEALTHY" | "BREACHED" | "UNAVAILABLE" | "PENDING";
+  rollbackTelemetryEvidence?: any[];
 
   createdAt?: Date;
   updatedAt?: Date;
@@ -71,7 +93,23 @@ const deploymentSchema = new Schema<IDeployment>(
     targetPort: { type: Number },
     status: {
       type: String,
-      enum: ["BUILDING", "DEPLOYING", "RUNNING", "HEALTHY", "FAILED", "ROLLED_BACK"],
+      enum: [
+        "BUILDING",
+        "DEPLOYING",
+        "DEPLOYED",
+        "RUNNING",
+        "VERIFYING",
+        "HEALTHY",
+        "STABLE",
+        "BREACHED",
+        "ROLLBACK_PENDING",
+        "ROLLING_BACK",
+        "VERIFYING_PREDECESSOR",
+        "ROLLED_BACK_SUCCESSFULLY",
+        "ROLLBACK_FAILED",
+        "FAILED",
+        "ROLLED_BACK",
+      ],
       default: "BUILDING",
     },
     healthCheckUrl: { type: String },
@@ -88,6 +126,18 @@ const deploymentSchema = new Schema<IDeployment>(
     predecessorImage: { type: String, trim: true },
     predecessorContainer: { type: String, trim: true },
     lockId: { type: String, trim: true },
+    // Phase 5.3 Batch B: Rollback State Machine & Audit
+    rollbackStartedAt: { type: Date },
+    rollbackCompletedAt: { type: Date },
+    rollbackStatus: {
+      type: String,
+      enum: ["ROLLBACK_PENDING", "ROLLING_BACK", "ROLLED_BACK_SUCCESSFULLY", "ROLLBACK_FAILED"],
+    },
+    rollbackVerificationStatus: {
+      type: String,
+      enum: ["HEALTHY", "BREACHED", "UNAVAILABLE", "PENDING"],
+    },
+    rollbackTelemetryEvidence: [{ type: Schema.Types.Mixed }],
   },
   {
     timestamps: true,

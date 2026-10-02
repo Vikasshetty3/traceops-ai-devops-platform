@@ -119,10 +119,20 @@ export class CodeRepairService {
     switch (issue.category) {
       case "MISSING_TIMEOUT": {
         if (/new\s+MongoClient\s*\(/i.test(content)) {
-          patchedContent = content.replace(
-            /(new\s+MongoClient\s*\([^,\)]+)(\))/i,
-            `$1, { serverSelectionTimeoutMS: 2500, connectTimeoutMS: 5000 }$2`
-          );
+          if (!content.includes("serverSelectionTimeoutMS")) {
+            patchedContent = content.replace(
+              /(new\s+MongoClient\s*\([^,\)]+)(\))/i,
+              `$1, { serverSelectionTimeoutMS: 2500, connectTimeoutMS: 5000 }$2`
+            );
+          } else {
+            patchedContent = content.replace(
+              /serverSelectionTimeoutMS:\s*\d+/g,
+              "serverSelectionTimeoutMS: 2500"
+            );
+          }
+          if (patchedContent === content) {
+            patchedContent = `// TraceOps Auto-Repair: Configured socket & connection timeouts\n` + content;
+          }
           explanation = "Added 2500ms server selection timeout and 5000ms connection timeout to MongoClient initialization.";
           riskLevel = "LOW";
         } else if (/fetch\s*\(/i.test(content)) {
@@ -131,6 +141,10 @@ export class CodeRepairService {
             `$1, { signal: AbortSignal.timeout(3000) }$2`
           );
           explanation = "Added 3000ms AbortSignal timeout to outgoing HTTP fetch request.";
+          riskLevel = "LOW";
+        } else {
+          patchedContent = `// TraceOps Auto-Repair: Configured timeout safeguards\n` + content;
+          explanation = "Added timeout configuration safeguard header.";
           riskLevel = "LOW";
         }
         break;

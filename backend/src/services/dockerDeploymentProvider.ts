@@ -11,6 +11,7 @@ import { SLO } from "../models/SLO";
 import { Traceability } from "../models/Traceability";
 import { ProjectRuntimeInspector } from "./projectRuntimeInspector";
 import { DeploymentLockService } from "./deploymentLockService";
+import { PostDeploymentVerificationService } from "./postDeploymentVerificationService";
 
 const execAsync = promisify(exec);
 
@@ -55,7 +56,7 @@ export class DockerDeploymentProvider {
     // 5. Idempotency Check: Return existing running deployment if already deployed
     const existingDeployment = await Deployment.findOne({
       repairId: repair.repairId,
-      status: { $in: ["RUNNING", "HEALTHY"] },
+      status: { $in: ["RUNNING", "HEALTHY", "STABLE"] },
     });
     if (existingDeployment) {
       return {
@@ -86,7 +87,7 @@ export class DockerDeploymentProvider {
     // 7. Capture Predecessor Container/Image Identity (PRESERVE PREDECESSOR, DO NOT KILL)
     const predecessorDeployment = await Deployment.findOne({
       service,
-      status: { $in: ["RUNNING", "HEALTHY"] },
+      status: { $in: ["RUNNING", "HEALTHY", "STABLE"] },
       repairId: { $ne: repairId },
     }).sort({ createdAt: -1 });
 
@@ -257,16 +258,14 @@ export class DockerDeploymentProvider {
       ).catch(() => ({ stdout: "none" }));
       logs.push(`[DOCKER HEALTH STATUS] Native Docker daemon health status: ${dockerHealthOut.trim()}`);
 
-      // 5. SLO Verification Probing
-      logs.push(`[SLO VERIFICATION] Measuring live p95 latency and error rate against deployed container...`);
-      const verificationResult = await this.verifySLOPerformance(
-        deploymentId,
-        projectId,
-        service,
-        hostPort,
-        healthPath,
-        probeResult.testedUrl
-      );
+      // 5. Post-Deployment Closed-Loop Prometheus Verification (Batch B)
+      logs.push(`[SLO VERIFICATION] Executing closed-loop Prometheus verification against deployed candidate container...`);
+      const verificationOutcome = await PostDeploymentVerificationService.verifyDeployment(deploymentId, {
+        stabilizationWindowSeconds: 4,
+        sampleIntervalMs: 1000,
+        autoRollbackOnBreach: false,
+      });
+      const verificationResult = verificationOutcome.verification;
 
       // 6. Update Traceability
       await Traceability.updateMany(
@@ -278,6 +277,7 @@ export class DockerDeploymentProvider {
       await repair.save();
 
       logs.push(`[DEPLOYMENT COMPLETE] ✓ Deployment ${deploymentId} fully operational and verified.`);
+      deployment.status = verificationOutcome.deployment.status;
       await deployment.save();
 
       return { deployment, verification: verificationResult };
@@ -303,34 +303,7 @@ export class DockerDeploymentProvider {
     reason: string
   ): Promise<void> {
     this.validateContainerName(containerName);
-
-    // 1. Remove failed container (Host fallback process execution is completely eliminated)
-    await this.runDockerCommand(`docker rm -f ${containerName}`).catch(() => {});
-
-    // 2. Mark deployment as ROLLED_BACK
-    deployment.status = "ROLLED_BACK";
-    deployment.rolledBackAt = new Date();
-    deployment.rollbackReason = reason;
-    deployment.deploymentLogs.push(`[ROLLBACK COMPLETED] Container ${containerName} removed. System state restored.`);
-    await deployment.save();
-
-    // 3. Create an incident in MongoDB documenting the rollback
-    await Incident.create({
-      incidentId: `INC-ROLLBACK-${Date.now().toString().slice(-4)}`,
-      projectId: deployment.projectId,
-      requirementId: `REQ-${deployment.projectId.replace("PROJ-", "")}-001`,
-      sloId: `SLO-${deployment.projectId.replace("PROJ-", "")}-001`,
-      service: deployment.service,
-      metric: "latency",
-      actualValue: 5.0,
-      threshold: 2.0,
-      severity: "CRITICAL",
-      status: "OPEN",
-      message: `Automated rollback triggered for ${deployment.deploymentId}: ${reason}`,
-      logs: [`Rollback initiated: ${reason}`],
-      metrics: { latency: 5.0, errorRate: 1.0 },
-      createdAt: new Date(),
-    }).catch((e) => console.error("Incident log error:", e));
+    await PostDeploymentVerificationService.executeRollback(deployment.deploymentId, reason);
   }
 
   /**

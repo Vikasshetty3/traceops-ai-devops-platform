@@ -3,18 +3,41 @@ import mongoose, { Document, Schema } from "mongoose";
 export interface IDeploymentVerification extends Document {
   verificationId: string;
   deploymentId: string;
+  repairId?: string;
   projectId: string;
   service: string;
   sloId?: string;
+  candidateCommitSha?: string;
+  candidateImage?: string;
+  predecessorImage?: string;
+  predecessorContainer?: string;
+  promQl?: string;
+  target?: number;
+  operator?: string;
+  observationWindow?: number;
+  verificationStart?: Date;
+  verificationEnd?: Date;
+  samples?: Array<{ timestamp: Date; value: number | null; raw?: any }>;
+  baselineEvidenceHash?: string;
+  baselineValue?: number;
+  actualValue?: number | null;
+  status:
+    | "HEALTHY"
+    | "BREACHED"
+    | "INSUFFICIENT_TELEMETRY"
+    | "PROMETHEUS_UNAVAILABLE"
+    | "VERIFICATION_TIMEOUT"
+    | "COMPLIANT"
+    | "NON_COMPLIANT";
   healthCheckPassed: boolean;
-  healthCheckLatencyMs: number;
-  sloMetric: string;
-  beforeValue: number;
-  afterValue: number;
-  targetValue: number;
-  targetUnit: string;
-  sloCompliant: boolean;
-  improvementPercentage: number;
+  healthCheckLatencyMs?: number;
+  sloMetric?: string;
+  beforeValue?: number;
+  afterValue?: number;
+  targetValue?: number;
+  targetUnit?: string;
+  sloCompliant?: boolean;
+  improvementPercentage?: number;
   verificationLogs: string[];
   verifiedAt: Date;
   createdAt?: Date;
@@ -35,6 +58,11 @@ const deploymentVerificationSchema = new Schema<IDeploymentVerification>(
       trim: true,
       index: true,
     },
+    repairId: {
+      type: String,
+      trim: true,
+      index: true,
+    },
     projectId: {
       type: String,
       required: true,
@@ -50,9 +78,36 @@ const deploymentVerificationSchema = new Schema<IDeploymentVerification>(
       type: String,
       trim: true,
     },
+    candidateCommitSha: { type: String, trim: true },
+    candidateImage: { type: String, trim: true },
+    predecessorImage: { type: String, trim: true },
+    predecessorContainer: { type: String, trim: true },
+    promQl: { type: String },
+    target: { type: Number },
+    operator: { type: String, trim: true },
+    observationWindow: { type: Number, default: 5 },
+    verificationStart: { type: Date },
+    verificationEnd: { type: Date },
+    samples: [{ timestamp: { type: Date }, value: { type: Number }, raw: { type: Schema.Types.Mixed } }],
+    baselineEvidenceHash: { type: String, trim: true },
+    baselineValue: { type: Number },
+    actualValue: { type: Number },
+    status: {
+      type: String,
+      enum: [
+        "HEALTHY",
+        "BREACHED",
+        "INSUFFICIENT_TELEMETRY",
+        "PROMETHEUS_UNAVAILABLE",
+        "VERIFICATION_TIMEOUT",
+        "COMPLIANT",
+        "NON_COMPLIANT",
+      ],
+      default: "HEALTHY",
+    },
     healthCheckPassed: {
       type: Boolean,
-      required: true,
+      default: true,
     },
     healthCheckLatencyMs: {
       type: Number,
@@ -60,19 +115,19 @@ const deploymentVerificationSchema = new Schema<IDeploymentVerification>(
     },
     sloMetric: {
       type: String,
-      required: true,
+      default: "latency",
     },
     beforeValue: {
       type: Number,
-      required: true,
+      default: 0,
     },
     afterValue: {
       type: Number,
-      required: true,
+      default: 0,
     },
     targetValue: {
       type: Number,
-      required: true,
+      default: 0,
     },
     targetUnit: {
       type: String,
@@ -80,7 +135,7 @@ const deploymentVerificationSchema = new Schema<IDeploymentVerification>(
     },
     sloCompliant: {
       type: Boolean,
-      required: true,
+      default: true,
     },
     improvementPercentage: {
       type: Number,
