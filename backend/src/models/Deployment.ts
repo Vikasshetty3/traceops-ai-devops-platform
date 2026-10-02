@@ -56,10 +56,15 @@ export interface IDeployment extends Document {
   candidateTrafficWeight?: number;
   predecessorTrafficWeight?: number;
   currentCanaryStage?: string;
+  canaryStatus?: "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED" | "ABORTED";
+  canaryStartedAt?: Date;
+  canaryCompletedAt?: Date;
   canaryStages?: Array<{
     stage: string;
     candidateWeight: number;
     predecessorWeight: number;
+    durationSeconds?: number;
+    elapsedSeconds?: number;
     enteredAt: Date;
     completedAt?: Date;
     status: string;
@@ -164,11 +169,20 @@ const deploymentSchema = new Schema<IDeployment>(
     candidateTrafficWeight: { type: Number, default: 0, min: 0, max: 100 },
     predecessorTrafficWeight: { type: Number, default: 100, min: 0, max: 100 },
     currentCanaryStage: { type: String, trim: true },
+    canaryStatus: {
+      type: String,
+      enum: ["NOT_STARTED", "IN_PROGRESS", "COMPLETED", "ABORTED"],
+      default: "NOT_STARTED",
+    },
+    canaryStartedAt: { type: Date },
+    canaryCompletedAt: { type: Date },
     canaryStages: [
       {
         stage: { type: String, required: true },
         candidateWeight: { type: Number, required: true },
         predecessorWeight: { type: Number, required: true },
+        durationSeconds: { type: Number },
+        elapsedSeconds: { type: Number },
         enteredAt: { type: Date, default: Date.now },
         completedAt: { type: Date },
         status: { type: String },

@@ -15,6 +15,7 @@ import { DeploymentLockConflictError } from "../services/deploymentLockService";
 import { PostDeploymentVerificationService } from "../services/postDeploymentVerificationService";
 import { DeploymentAuditService } from "../services/deploymentAuditService";
 import { TrafficRoutingService } from "../services/trafficRoutingService";
+import { CanaryProgressionService } from "../services/canaryProgressionService";
 
 /**
  * Trigger static issue detection scan on a project
@@ -966,6 +967,199 @@ export const proxyDeploymentGateway = async (req: Request, res: Response): Promi
     }
   }
 };
+
+/**
+ * Phase 5.3 Batch C3 — Canary Rollout Initiation
+ * Initializes progressive canary deployment at Stage 0 (Warmup, 0% candidate / 100% predecessor).
+ * Endpoint: POST /api/deployments/:deploymentId/canary/start
+ */
+export const startCanaryDeployment = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const deploymentId = String(req.params.deploymentId || req.params.id);
+    const { strategy, actor, reason, candidateHostPort, predecessorHostPort, options } = req.body || {};
+
+    const status = await CanaryProgressionService.startCanary({
+      deploymentId,
+      strategy,
+      actor: actor || (req.headers["x-user-id"] as string) || "Canary Operator",
+      reason,
+      candidateHostPort,
+      predecessorHostPort,
+      options,
+    });
+
+    res.status(200).json({
+      success: true,
+      deploymentId: status.deploymentId,
+      strategy: status.strategy,
+      canaryStatus: status.canaryStatus,
+      currentStage: status.currentStage,
+      candidateWeight: status.candidateWeight,
+      predecessorWeight: status.predecessorWeight,
+      stageEnteredAt: status.stageEnteredAt,
+      requiredBakeDurationSeconds: status.requiredBakeDurationSeconds,
+      elapsedBakeSeconds: status.elapsedBakeSeconds,
+      remainingBakeSeconds: status.remainingBakeSeconds,
+      isBakeComplete: status.isBakeComplete,
+      nextStage: status.nextStage,
+      canAdvance: status.canAdvance,
+      message: `Canary rollout successfully initiated at ${status.currentStage} (0% candidate / 100% predecessor)`,
+      data: status,
+    });
+  } catch (error: any) {
+    const message = error instanceof Error ? error.message : String(error);
+    const isConflict = error instanceof DeploymentLockConflictError || message.includes("DeploymentLockConflict");
+    const isNotFound = message.includes("not found");
+    const isSafetyGate =
+      message.includes("Safety Gate") ||
+      message.includes("Canary Lifecycle") ||
+      message.includes("Strategy Violation");
+
+    const statusCode = isConflict ? 409 : isNotFound ? 404 : isSafetyGate ? 400 : 500;
+
+    res.status(statusCode).json({
+      success: false,
+      message,
+      error: message,
+    });
+  }
+};
+
+/**
+ * Phase 5.3 Batch C3 — Advance Canary Stage
+ * Progresses an active canary deployment to the next stage upon completion of bake/stabilization timing.
+ * Endpoint: POST /api/deployments/:deploymentId/canary/advance
+ */
+export const advanceCanaryDeployment = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const deploymentId = String(req.params.deploymentId || req.params.id);
+    const { targetStage, targetWeight, actor, reason, options } = req.body || {};
+
+    const status = await CanaryProgressionService.advanceCanary({
+      deploymentId,
+      targetStage,
+      targetWeight,
+      actor: actor || (req.headers["x-user-id"] as string) || "Canary Operator",
+      reason,
+      options,
+    });
+
+    res.status(200).json({
+      success: true,
+      deploymentId: status.deploymentId,
+      strategy: status.strategy,
+      canaryStatus: status.canaryStatus,
+      currentStage: status.currentStage,
+      candidateWeight: status.candidateWeight,
+      predecessorWeight: status.predecessorWeight,
+      stageEnteredAt: status.stageEnteredAt,
+      requiredBakeDurationSeconds: status.requiredBakeDurationSeconds,
+      elapsedBakeSeconds: status.elapsedBakeSeconds,
+      remainingBakeSeconds: status.remainingBakeSeconds,
+      isBakeComplete: status.isBakeComplete,
+      nextStage: status.nextStage,
+      canAdvance: status.canAdvance,
+      message: `Canary advanced to ${status.currentStage} (${status.candidateWeight}% candidate / ${status.predecessorWeight}% predecessor)`,
+      data: status,
+    });
+  } catch (error: any) {
+    const message = error instanceof Error ? error.message : String(error);
+    const isConflict = error instanceof DeploymentLockConflictError || message.includes("DeploymentLockConflict");
+    const isNotFound = message.includes("not found");
+    const isBakeIncomplete = error.statusCode === 412 || message.includes("Bake Duration Incomplete");
+    const isTransitionError =
+      message.includes("Invalid Canary Stage Transition") ||
+      message.includes("Canary Lifecycle") ||
+      message.includes("Safety Gate") ||
+      message.includes("Strategy Violation");
+
+    const statusCode = isConflict ? 409 : isNotFound ? 404 : isBakeIncomplete ? 412 : isTransitionError ? 400 : 500;
+
+    res.status(statusCode).json({
+      success: false,
+      message,
+      error: message,
+    });
+  }
+};
+
+/**
+ * Phase 5.3 Batch C3 — Query Canary Status
+ * Returns real-time canary progression state, bake timer status, and next eligible stage.
+ * Endpoint: GET /api/deployments/:deploymentId/canary/status
+ */
+export const getCanaryDeploymentStatus = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const deploymentId = String(req.params.deploymentId || req.params.id);
+    const status = await CanaryProgressionService.getCanaryStatus(deploymentId);
+
+    res.status(200).json({
+      success: true,
+      deploymentId: status.deploymentId,
+      strategy: status.strategy,
+      canaryStatus: status.canaryStatus,
+      currentStage: status.currentStage,
+      candidateWeight: status.candidateWeight,
+      predecessorWeight: status.predecessorWeight,
+      stageEnteredAt: status.stageEnteredAt,
+      requiredBakeDurationSeconds: status.requiredBakeDurationSeconds,
+      elapsedBakeSeconds: status.elapsedBakeSeconds,
+      remainingBakeSeconds: status.remainingBakeSeconds,
+      isBakeComplete: status.isBakeComplete,
+      nextStage: status.nextStage,
+      canAdvance: status.canAdvance,
+      history: status.history,
+      data: status,
+    });
+  } catch (error: any) {
+    const message = error instanceof Error ? error.message : String(error);
+    const isNotFound = message.includes("not found");
+    res.status(isNotFound ? 404 : 500).json({
+      success: false,
+      message,
+      error: message,
+    });
+  }
+};
+
+/**
+ * Phase 5.3 Batch C3 — Abort Canary Deployment
+ * Emergency clamp back to 100% predecessor and transition to ABORTED state.
+ * Endpoint: POST /api/deployments/:deploymentId/canary/abort
+ */
+export const abortCanaryDeployment = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const deploymentId = String(req.params.deploymentId || req.params.id);
+    const { reason, actor } = req.body || {};
+
+    const status = await CanaryProgressionService.abortCanary(
+      deploymentId,
+      reason || "Manual operator abort requested",
+      actor || (req.headers["x-user-id"] as string) || "Canary Operator"
+    );
+
+    res.status(200).json({
+      success: true,
+      deploymentId: status.deploymentId,
+      strategy: status.strategy,
+      canaryStatus: status.canaryStatus,
+      currentStage: status.currentStage,
+      candidateWeight: status.candidateWeight,
+      predecessorWeight: status.predecessorWeight,
+      message: "Canary deployment aborted; traffic clamped to 100% predecessor",
+      data: status,
+    });
+  } catch (error: any) {
+    const message = error instanceof Error ? error.message : String(error);
+    const isNotFound = message.includes("not found");
+    res.status(isNotFound ? 404 : 500).json({
+      success: false,
+      message,
+      error: message,
+    });
+  }
+};
+
 
 
 

@@ -25,6 +25,10 @@ import {
   setDeploymentTraffic,
   advanceDeploymentTraffic,
   proxyDeploymentGateway,
+  startCanaryDeployment,
+  advanceCanaryDeployment,
+  getCanaryDeploymentStatus,
+  abortCanaryDeployment,
 } from "../controllers/repairController";
 
 const router = Router();
@@ -69,5 +73,11 @@ router.get("/deployments/:deploymentId/traffic", getDeploymentTraffic);
 router.post("/deployments/:deploymentId/traffic", setDeploymentTraffic);
 router.post("/deployments/:deploymentId/traffic/advance", advanceDeploymentTraffic);
 router.use("/deployments/:deploymentId/gateway", proxyDeploymentGateway);
+
+// Phase 5.3 Batch C3 — Canary Progression Controller
+router.post("/deployments/:deploymentId/canary/start", startCanaryDeployment);
+router.post("/deployments/:deploymentId/canary/advance", advanceCanaryDeployment);
+router.get("/deployments/:deploymentId/canary/status", getCanaryDeploymentStatus);
+router.post("/deployments/:deploymentId/canary/abort", abortCanaryDeployment);
 
 export default router;
