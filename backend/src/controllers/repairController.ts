@@ -16,6 +16,8 @@ import { PostDeploymentVerificationService } from "../services/postDeploymentVer
 import { DeploymentAuditService } from "../services/deploymentAuditService";
 import { TrafficRoutingService } from "../services/trafficRoutingService";
 import { CanaryProgressionService } from "../services/canaryProgressionService";
+import { AutomatedCanaryAnalysisService } from "../services/automatedCanaryAnalysisService";
+import { CanaryRollbackIntegrationService } from "../services/canaryRollbackIntegrationService";
 
 /**
  * Trigger static issue detection scan on a project
@@ -772,6 +774,7 @@ export const verifyDeploymentAuditChain = async (req: Request, res: Response): P
       success: verification.valid,
       deploymentId,
       verification,
+      ...verification,
     });
   } catch (error: any) {
     res.status(500).json({
@@ -1159,6 +1162,36 @@ export const abortCanaryDeployment = async (req: Request, res: Response): Promis
     });
   }
 };
+
+/**
+ * Phase 5.3 Batch C4 — Evaluate Canary Prometheus Gating (ACA)
+ * Evaluates live PromQL metrics against linked SLO for current canary stage.
+ * Endpoint: POST /api/deployments/:deploymentId/canary/evaluate
+ */
+export const evaluateCanaryDeployment = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const deploymentId = String(req.params.deploymentId || req.params.id);
+    const options = req.body || {};
+
+    const evaluation = await AutomatedCanaryAnalysisService.evaluateCanaryStage(deploymentId, options);
+
+    res.status(evaluation.passed ? 200 : 412).json({
+      success: evaluation.passed,
+      message: evaluation.reason,
+      data: evaluation,
+      ...evaluation,
+    });
+  } catch (error: any) {
+    const message = error instanceof Error ? error.message : String(error);
+    const isNotFound = message.includes("not found");
+    res.status(isNotFound ? 404 : 500).json({
+      success: false,
+      message,
+      error: message,
+    });
+  }
+};
+
 
 
 

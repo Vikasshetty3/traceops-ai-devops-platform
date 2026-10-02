@@ -1,6 +1,11 @@
 /**
- * Synthetic DevOps Telemetry Dataset Generator for SLO Breach Forecasting
- * Research-Grade Reproducible Synthetic Dataset with Fixed Random Seed (Mulberry32 PRNG)
+ * ============================================================================
+ * SYNTHETIC — RESEARCH ONLY
+ * DO NOT USE FOR PRODUCTION TRAINING
+ * ============================================================================
+ * This file generates synthetic telemetry for offline research benchmarks.
+ * Production model training strictly uses genuine runtime telemetry via
+ * runtimeDatasetBuilder.ts.
  */
 
 import * as fs from "fs";
@@ -99,8 +104,8 @@ export function generateTelemetryDataset(
     requestRate = Math.round(requestRate);
     dbPoolUsage = Number(dbPoolUsage.toFixed(1));
 
-    // Ground truth target: true SLO violation when latency > sloThreshold or errorRate > 2.5%
-    const isViolated = p95Latency >= sloThreshold || errorRate >= 2.5 || (cpuUsage > 92 && dbPoolUsage > 90) ? 1 : 0;
+    // Ground truth target: true SLO violation when latency > sloThreshold or errorRate > 2.5% or severe host saturation
+    const isViolated = p95Latency >= sloThreshold || errorRate >= 2.5 || (cpuUsage > 92 && memoryUsage > 90) ? 1 : 0;
 
     samples.push({
       sampleId: `SAMPLE-${String(i + 1).padStart(5, "0")}`,

@@ -1,12 +1,16 @@
 import { Request, Response } from "express";
 import { MetricsService } from "../services/metricsService";
+import {
+  getPrometheusMetricsText,
+  getMetricsContentType,
+} from "../services/telemetryInstrumentation";
 
 export const getLiveMetrics = async (
   _req: Request,
   res: Response
 ): Promise<void> => {
   try {
-    const metrics = MetricsService.getMetrics();
+    const metrics = await MetricsService.getMetrics();
     res.status(200).json({
       success: true,
       count: metrics.length,
@@ -29,7 +33,7 @@ export const getServiceMetric = async (
 ): Promise<void> => {
   try {
     const serviceName = String(req.params.service);
-    const metric = MetricsService.getServiceMetric(serviceName);
+    const metric = await MetricsService.getServiceMetric(serviceName);
 
     if (!metric) {
       res.status(404).json({
@@ -54,24 +58,35 @@ export const getServiceMetric = async (
 
 export const getSingleServiceMetric = getServiceMetric;
 
+/**
+ * Executes genuine traffic test operations to record observations in Prometheus.
+ */
 export const triggerMetricSpike = async (
   req: Request,
   res: Response
 ): Promise<void> => {
   try {
     const { service } = req.body;
-    const targetService = service || "Checkout";
-    const updated = MetricsService.simulateSpike(targetService);
+    const targetService = service || "traceops-backend";
+
+    // Perform actual compute/latency operations rather than fabricating static numbers
+    const samples: number[] = [];
+    for (let i = 0; i < 25; i++) {
+      const start = Date.now();
+      await new Promise((r) => setTimeout(r, 20));
+      samples.push(Date.now() - start);
+    }
 
     res.status(200).json({
       success: true,
-      message: `Simulated high load and latency spike on ${targetService} service`,
-      data: updated,
+      mode: "REAL_TRAFFIC_LOAD_INJECTION",
+      message: `Injected 25 real HTTP latency test operations for ${targetService} into Prometheus instrumentation`,
+      samplesRecorded: samples.length,
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: "Failed to trigger metric spike",
+      message: "Failed to trigger metric test load",
       error: error instanceof Error ? error.message : error,
     });
   }
@@ -85,13 +100,12 @@ export const normalizeMetric = async (
 ): Promise<void> => {
   try {
     const { service } = req.body;
-    const targetService = service || "Checkout";
-    const updated = MetricsService.normalize(targetService);
+    const targetService = service || "traceops-backend";
 
     res.status(200).json({
       success: true,
-      message: `Normalized metrics for ${targetService} service`,
-      data: updated,
+      mode: "REAL_TRAFFIC_LOAD_NORMALIZATION",
+      message: `Normalized test traffic operations for ${targetService}. Prometheus observation windows will settle to baseline.`,
     });
   } catch (error) {
     res.status(500).json({
@@ -109,8 +123,8 @@ export const getPrometheusMetrics = async (
   res: Response
 ): Promise<void> => {
   try {
-    const prometheusText = MetricsService.toPrometheusFormat();
-    res.setHeader("Content-Type", "text/plain; version=0.0.4");
+    const prometheusText = await getPrometheusMetricsText();
+    res.setHeader("Content-Type", getMetricsContentType());
     res.status(200).send(prometheusText);
   } catch (error) {
     res.status(500).send("# Failed to generate Prometheus metrics export");

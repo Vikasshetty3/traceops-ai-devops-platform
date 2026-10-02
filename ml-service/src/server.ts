@@ -10,73 +10,158 @@ app.use(express.json());
 
 // Load trained model if available on filesystem
 SLOViolationClassifier.loadTrainedModel();
+// Load candidate model if artifact exists on filesystem
+SLOViolationClassifier.loadCandidateModel();
 
 app.get("/health", (_req: Request, res: Response) => {
   res.status(200).json({
     status: "HEALTHY",
     service: "traceops-ml-service",
-    model: "LogisticRegression-SLOClassifier-v1",
+    model: "LogisticRegression-SLOClassifier",
+    modelVersion: SLOViolationClassifier.MODEL_VERSION,
+    schemaVersion: SLOViolationClassifier.FEATURE_SCHEMA_VERSION,
     timestamp: new Date().toISOString(),
   });
 });
 
-app.get("/model-info", (_req: Request, res: Response) => {
+app.get("/model-info", (req: Request, res: Response) => {
+  const modelType = (req.query.model || req.query.version || "").toString().toLowerCase();
+  if (modelType === "candidate" || modelType === "3.0.0-real-runtime-training") {
+    const candidateInfo = SLOViolationClassifier.getCandidateModelInfo();
+    if (!candidateInfo) {
+      return res.status(404).json({ success: false, message: "Candidate model 3.0.0 not found or not loaded" });
+    }
+    return res.status(200).json({ success: true, data: candidateInfo });
+  }
   res.status(200).json({
     success: true,
     data: SLOViolationClassifier.getModelInfo(),
   });
 });
 
+app.get("/models", (_req: Request, res: Response) => {
+  res.status(200).json({
+    success: true,
+    data: SLOViolationClassifier.getRegistry(),
+  });
+});
+
 app.post("/predict", (req: Request, res: Response): void => {
   try {
     const {
+      incidentId,
+      sloId,
       requirementId,
       service,
+      featureTimestamp,
+      features,
+      featureSources,
+      // Direct feature fields
       cpuUsage,
       memoryUsage,
       errorRate,
       latency,
+      p95Latency,
       requestRate,
-      dbPoolUsage,
       deploymentChanged,
     } = req.body;
 
-    if (
-      cpuUsage === undefined ||
-      memoryUsage === undefined ||
-      errorRate === undefined ||
-      latency === undefined
-    ) {
+    const requestedModel = (req.query.model || req.body.model || "").toString().toLowerCase();
+    const isCandidate =
+      requestedModel === "candidate" ||
+      requestedModel === "3.0.0-real-runtime-training" ||
+      requestedModel === "3.1.0-real-runtime-training";
+
+    // Rule 5: NO DEFAULT SERVICE. Must come from caller or incident context.
+    if (!service || typeof service !== "string" || service.trim() === "") {
       res.status(400).json({
         success: false,
-        message: "Missing required telemetry features (cpuUsage, memoryUsage, errorRate, latency)",
+        status: "ERROR",
+        message: "service is required. No default service is permitted.",
       });
       return;
     }
 
-    const prediction = SLOViolationClassifier.predict({
-      cpuUsage: Number(cpuUsage),
-      memoryUsage: Number(memoryUsage),
-      errorRate: Number(errorRate),
-      latency: Number(latency),
-      requestRate: requestRate !== undefined ? Number(requestRate) : undefined,
-      dbPoolUsage: dbPoolUsage !== undefined ? Number(dbPoolUsage) : undefined,
-      deploymentChanged,
-    });
+    // Rule 6: NO DEFAULT REQUIREMENT. Must be genuine or null.
+    const resolvedRequirementId =
+      requirementId !== undefined && requirementId !== null && requirementId !== "UNLINKED"
+        ? String(requirementId)
+        : null;
+
+    // Merge direct telemetry or nested features object
+    const effectiveFeatures = {
+      cpuUsage: features?.cpuUsage !== undefined ? features.cpuUsage : cpuUsage,
+      memoryUsage: features?.memoryUsage !== undefined ? features.memoryUsage : memoryUsage,
+      errorRate: features?.errorRate !== undefined ? features.errorRate : errorRate,
+      p95Latency:
+        features?.p95Latency !== undefined
+          ? features.p95Latency
+          : p95Latency !== undefined
+          ? p95Latency
+          : features?.latency !== undefined
+          ? features.latency
+          : latency,
+      latency:
+        features?.latency !== undefined
+          ? features.latency
+          : latency !== undefined
+          ? latency
+          : features?.p95Latency !== undefined
+          ? features.p95Latency
+          : p95Latency,
+      requestRate: features?.requestRate !== undefined ? features.requestRate : requestRate,
+      deploymentChanged:
+        features?.deploymentChanged !== undefined ? features.deploymentChanged : deploymentChanged,
+    };
+
+    const prediction = isCandidate
+      ? SLOViolationClassifier.predictCandidate(effectiveFeatures)
+      : SLOViolationClassifier.predict(effectiveFeatures);
+
+    if (prediction.status === "INSUFFICIENT_TELEMETRY") {
+      res.status(200).json({
+        success: false,
+        status: "INSUFFICIENT_TELEMETRY",
+        message: "Insufficient telemetry for ML prediction",
+        missingFeatures: prediction.missingFeatures,
+        service: service.trim(),
+        requirementId: resolvedRequirementId,
+        incidentId: incidentId || undefined,
+        sloId: sloId || undefined,
+        modelVersion: prediction.modelVersion,
+        schemaVersion: SLOViolationClassifier.FEATURE_SCHEMA_VERSION,
+      });
+      return;
+    }
+
+    const effectiveTimestamp = featureTimestamp || new Date().toISOString();
 
     res.status(200).json({
       success: true,
+      status: "SUCCESS",
       data: {
-        requirementId: requirementId || "REQ-001",
-        service: service || "Checkout",
+        service: service.trim(),
+        requirementId: resolvedRequirementId,
+        incidentId: incidentId || undefined,
+        sloId: sloId || undefined,
+        featureTimestamp: effectiveTimestamp,
+        features: {
+          cpuUsage: effectiveFeatures.cpuUsage,
+          memoryUsage: effectiveFeatures.memoryUsage,
+          p95Latency: effectiveFeatures.p95Latency,
+          errorRate: effectiveFeatures.errorRate,
+          requestRate: effectiveFeatures.requestRate,
+          deploymentChanged: effectiveFeatures.deploymentChanged ? 1 : 0,
+        },
+        featureSources: featureSources || undefined,
         ...prediction,
       },
     });
-  } catch (error) {
-    res.status(500).json({
+  } catch (error: any) {
+    res.status(400).json({
       success: false,
-      message: "ML Prediction evaluation failed",
-      error: error instanceof Error ? error.message : error,
+      status: "ERROR",
+      message: error.message || "ML Prediction evaluation failed",
     });
   }
 });
@@ -84,7 +169,7 @@ app.post("/predict", (req: Request, res: Response): void => {
 // Start listener only when run directly
 if (require.main === module) {
   app.listen(PORT, () => {
-    console.log(`Research-Grade ML Prediction Service running on http://localhost:${PORT}`);
+    console.log(`Phase 3 Production ML Prediction Service running on http://localhost:${PORT}`);
   });
 }
 

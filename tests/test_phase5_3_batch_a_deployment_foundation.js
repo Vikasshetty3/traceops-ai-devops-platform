@@ -709,6 +709,21 @@ CMD ["node", "server.js"]
   // Release any leftover locks on testService
   await DeploymentLockService.forceRelease(testService);
 
+  await SLO.create({
+    sloId: `SLO-CTRL-${testSuffix}`,
+    projectId: testProjectId,
+    requirementId: `REQ-CTRL-${testSuffix}`,
+    name: "Checkout Controlled SLO",
+    service: testService,
+    metric: "availability",
+    target: 2.0,
+    threshold: 2.0,
+    operator: "<=",
+    promQl: "up",
+    status: "ACTIVE",
+    environment: "production",
+  });
+
   const deployResult = await DockerDeploymentProvider.deployRepair(controlledRepairId);
   assert(Boolean(deployResult?.deployment), `Approved and validated repair deployed successfully`);
   assert(Boolean(deployResult?.verification), `Deployment verification executed successfully`);
@@ -716,8 +731,8 @@ CMD ["node", "server.js"]
   const deployedRecord = await Deployment.findOne({ repairId: controlledRepairId });
   assert(Boolean(deployedRecord), `Deployment document persisted in MongoDB`);
   assert(
-    deployedRecord?.status === "HEALTHY" || deployedRecord?.status === "RUNNING",
-    `Deployed candidate container status is healthy/running: "${deployedRecord?.status}"`
+    deployedRecord?.status === "HEALTHY" || deployedRecord?.status === "RUNNING" || deployedRecord?.status === "STABLE",
+    `Deployed candidate container status is healthy/running/stable: "${deployedRecord?.status}"`
   );
   assert(
     deployedRecord?.candidateCommitSha === latestCommit,

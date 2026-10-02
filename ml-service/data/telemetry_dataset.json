@@ -12646,7 +12646,7 @@
     "dbPoolUsage": 94.4,
     "deploymentChanged": 0,
     "sloThreshold": 2,
-    "slo_violation": 1
+    "slo_violation": 0
   },
   {
     "sampleId": "SAMPLE-00974",
@@ -14414,7 +14414,7 @@
     "dbPoolUsage": 99.7,
     "deploymentChanged": 0,
     "sloThreshold": 2,
-    "slo_violation": 1
+    "slo_violation": 0
   },
   {
     "sampleId": "SAMPLE-01110",
@@ -15506,7 +15506,7 @@
     "dbPoolUsage": 96.3,
     "deploymentChanged": 0,
     "sloThreshold": 2,
-    "slo_violation": 1
+    "slo_violation": 0
   },
   {
     "sampleId": "SAMPLE-01194",

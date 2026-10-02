@@ -66,9 +66,7 @@ function createSampleBuggyProjectZip() {
       build: "node --check server.js",
       test: "node -e \"console.log('Unit tests passed')\"",
     },
-    dependencies: {
-      express: "^4.18.2",
-    },
+    dependencies: {},
   };
 
   const serverJs = `const http = require("http");

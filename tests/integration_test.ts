@@ -91,6 +91,7 @@ async function runTests() {
         memoryUsage: 60,
         errorRate: 2.0,
         latency: 2.8,
+        requestRate: 2.5,
         deploymentChanged: 0,
       }),
     });

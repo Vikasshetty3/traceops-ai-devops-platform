@@ -48,11 +48,16 @@ export const IncidentsTab: React.FC<IncidentsTabProps> = ({
     setLoadingML(true);
     try {
       const res = await onPredictML({
-        cpuUsage: inc.metrics.cpuUsage,
-        memoryUsage: inc.metrics.memoryUsage,
-        errorRate: inc.metrics.errorRate,
-        latency: inc.actualValue ?? inc.metrics.latency,
-        deploymentChanged: inc.metrics.deploymentChanged ? 1 : 0,
+        incidentId: inc.incidentId,
+        sloId: inc.sloId,
+        service: inc.service,
+        requirementId: inc.requirementId,
+        cpuUsage: inc.metrics?.cpuUsage,
+        memoryUsage: inc.metrics?.memoryUsage,
+        errorRate: inc.metrics?.errorRate,
+        latency: inc.actualValue ?? inc.metrics?.latency,
+        requestRate: inc.metrics?.requestRate,
+        deploymentChanged: inc.metrics?.deploymentChanged ? 1 : 0,
       });
       setMlResult(res);
     } catch (e) {
@@ -112,16 +117,47 @@ export const IncidentsTab: React.FC<IncidentsTabProps> = ({
                         <ShieldAlert className="w-4 h-4 text-rose-500" />
                         <span style={{ fontWeight: 700, color: "#f8fafc", fontSize: "15px" }}>{inc.incidentId}</span>
                         <span style={{ fontSize: "12px", color: "#94a3b8" }}>({inc.service})</span>
+                        <span
+                          style={{
+                            fontSize: "10px",
+                            fontWeight: 700,
+                            padding: "2px 6px",
+                            borderRadius: "4px",
+                            backgroundColor:
+                              inc.source === "PROMETHEUS_SLO_MONITOR"
+                                ? "rgba(239, 68, 68, 0.2)"
+                                : inc.source === "DEPLOYMENT_ROLLBACK"
+                                ? "rgba(245, 158, 11, 0.2)"
+                                : "rgba(148, 163, 184, 0.15)",
+                            color:
+                              inc.source === "PROMETHEUS_SLO_MONITOR"
+                                ? "#f87171"
+                                : inc.source === "DEPLOYMENT_ROLLBACK"
+                                ? "#fbbf24"
+                                : "#94a3b8",
+                            border: `1px solid ${
+                              inc.source === "PROMETHEUS_SLO_MONITOR"
+                                ? "rgba(239, 68, 68, 0.4)"
+                                : inc.source === "DEPLOYMENT_ROLLBACK"
+                                ? "rgba(245, 158, 11, 0.4)"
+                                : "rgba(148, 163, 184, 0.3)"
+                            }`,
+                          }}
+                        >
+                          {inc.source === "PROMETHEUS_SLO_MONITOR"
+                            ? "LIVE MONITOR"
+                            : inc.source || "HISTORICAL"}
+                        </span>
                       </div>
                       <StatusBadge status={inc.status} size="sm" />
                     </div>
 
                     <div style={{ fontSize: "13px", color: "#cbd5e1", marginBottom: "8px" }}>
-                      {inc.message || `SLO breach on ${inc.metric}: observed ${inc.actualValue}s vs target ${inc.threshold}s`}
+                      {inc.message || `SLO breach on ${inc.metric}: observed ${inc.actualValue} vs target ${inc.threshold}`}
                     </div>
 
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", color: "#64748b" }}>
-                      <span>Requirement: {inc.requirementId}</span>
+                      <span>SLO: {inc.sloId} | Req: {inc.requirementId}</span>
                       <StatusBadge status={inc.severity} size="sm" />
                     </div>
                   </div>
@@ -145,11 +181,36 @@ export const IncidentsTab: React.FC<IncidentsTabProps> = ({
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: "18px", color: "#f8fafc" }}>
-                    {selectedIncident.incidentId} Details
-                  </h3>
-                  <div style={{ fontSize: "13px", color: "#94a3b8", marginTop: "2px" }}>
-                    Bound to Requirement <span style={{ color: "#38bdf8" }}>{selectedIncident.requirementId}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <h3 style={{ margin: 0, fontSize: "18px", color: "#f8fafc" }}>
+                      {selectedIncident.incidentId}
+                    </h3>
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        fontWeight: 700,
+                        padding: "2px 8px",
+                        borderRadius: "4px",
+                        backgroundColor:
+                          selectedIncident.source === "PROMETHEUS_SLO_MONITOR"
+                            ? "rgba(239, 68, 68, 0.2)"
+                            : "rgba(148, 163, 184, 0.15)",
+                        color:
+                          selectedIncident.source === "PROMETHEUS_SLO_MONITOR"
+                            ? "#f87171"
+                            : "#94a3b8",
+                        border: `1px solid ${
+                          selectedIncident.source === "PROMETHEUS_SLO_MONITOR"
+                            ? "rgba(239, 68, 68, 0.4)"
+                            : "rgba(148, 163, 184, 0.3)"
+                        }`,
+                      }}
+                    >
+                      Source: {selectedIncident.source || "HISTORICAL"}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: "13px", color: "#94a3b8", marginTop: "4px" }}>
+                    SLO Target: <span style={{ color: "#38bdf8", fontWeight: 600 }}>{selectedIncident.sloId}</span> | Requirement: <span style={{ color: "#38bdf8" }}>{selectedIncident.requirementId}</span> | Service: <span style={{ color: "#f8fafc" }}>{selectedIncident.service}</span>
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: "8px" }}>
@@ -196,24 +257,86 @@ export const IncidentsTab: React.FC<IncidentsTabProps> = ({
                 </div>
               </div>
 
+              {/* Resolved Recovery Banner */}
+              {selectedIncident.status === "RESOLVED" && (
+                <div
+                  style={{
+                    padding: "10px 14px",
+                    borderRadius: "6px",
+                    backgroundColor: "rgba(16, 185, 129, 0.12)",
+                    border: "1px solid rgba(16, 185, 129, 0.3)",
+                    color: "#34d399",
+                    fontSize: "13px",
+                  }}
+                >
+                  ✓ <strong>RESOLVED</strong>: SLO recovered to compliant state
+                  {selectedIncident.recoveryValue !== undefined && selectedIncident.recoveryValue !== null
+                    ? ` (Measured recovery value: ${selectedIncident.recoveryValue})`
+                    : ""}
+                  {selectedIncident.resolvedAt
+                    ? ` at ${new Date(selectedIncident.resolvedAt).toLocaleTimeString()}`
+                    : ""}
+                </div>
+              )}
+
+              {/* PromQL Expression */}
+              {selectedIncident.promQl && (
+                <div style={{ fontSize: "12px", color: "#94a3b8" }}>
+                  <div style={{ marginBottom: "4px", fontWeight: 600 }}>PromQL Traceability:</div>
+                  <code
+                    style={{
+                      display: "block",
+                      padding: "8px",
+                      borderRadius: "4px",
+                      backgroundColor: "#020617",
+                      color: "#38bdf8",
+                      fontFamily: "monospace",
+                      overflowX: "auto",
+                      border: "1px solid rgba(148, 163, 184, 0.15)",
+                    }}
+                  >
+                    {selectedIncident.promQl}
+                  </code>
+                </div>
+              )}
+
               {/* Telemetry Snapshot Cards */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "10px", fontSize: "13px" }}>
                 <div style={{ padding: "10px", borderRadius: "6px", background: "rgba(15, 23, 42, 0.8)", border: "1px solid rgba(148, 163, 184, 0.15)" }}>
-                  <div style={{ color: "#94a3b8" }}>p95 Latency</div>
-                  <div style={{ fontSize: "16px", fontWeight: 700, color: "#ef4444" }}>
-                    {selectedIncident.actualValue != null ? `${selectedIncident.actualValue}s` : "No measurement available"}
+                  <div style={{ color: "#94a3b8" }}>Measured ({selectedIncident.metric})</div>
+                  <div style={{ fontSize: "16px", fontWeight: 700, color: selectedIncident.status === "RESOLVED" ? "#10b981" : "#ef4444" }}>
+                    {selectedIncident.actualValue != null ? `${selectedIncident.actualValue}` : "No measurement"}
+                  </div>
+                  <div style={{ fontSize: "11px", color: "#64748b" }}>Target: {selectedIncident.operator || "<"} {selectedIncident.threshold}</div>
+                </div>
+                <div style={{ padding: "10px", borderRadius: "6px", background: "rgba(15, 23, 42, 0.8)", border: "1px solid rgba(148, 163, 184, 0.15)" }}>
+                  <div style={{ color: "#94a3b8" }}>Error Rate</div>
+                  <div style={{ fontSize: "16px", fontWeight: 700, color: "#f8fafc" }}>
+                    {selectedIncident.metrics?.errorRate != null ? `${selectedIncident.metrics.errorRate}%` : "No measurement"}
+                  </div>
+                </div>
+                <div style={{ padding: "10px", borderRadius: "6px", background: "rgba(15, 23, 42, 0.8)", border: "1px solid rgba(148, 163, 184, 0.15)" }}>
+                  <div style={{ color: "#94a3b8" }}>Request Rate</div>
+                  <div style={{ fontSize: "16px", fontWeight: 700, color: "#f8fafc" }}>
+                    {selectedIncident.metrics?.requestRate != null ? `${selectedIncident.metrics.requestRate} req/s` : "No measurement"}
                   </div>
                 </div>
                 <div style={{ padding: "10px", borderRadius: "6px", background: "rgba(15, 23, 42, 0.8)", border: "1px solid rgba(148, 163, 184, 0.15)" }}>
                   <div style={{ color: "#94a3b8" }}>CPU Load</div>
                   <div style={{ fontSize: "16px", fontWeight: 700, color: "#f8fafc" }}>
-                    {selectedIncident.metrics?.cpuUsage != null ? `${selectedIncident.metrics.cpuUsage}%` : "No measurement available"}
+                    {selectedIncident.metrics?.cpuUsage != null ? `${selectedIncident.metrics.cpuUsage}%` : "No measurement"}
                   </div>
                 </div>
                 <div style={{ padding: "10px", borderRadius: "6px", background: "rgba(15, 23, 42, 0.8)", border: "1px solid rgba(148, 163, 184, 0.15)" }}>
                   <div style={{ color: "#94a3b8" }}>Memory</div>
                   <div style={{ fontSize: "16px", fontWeight: 700, color: "#f8fafc" }}>
-                    {selectedIncident.metrics?.memoryUsage != null ? `${selectedIncident.metrics.memoryUsage}%` : "No measurement available"}
+                    {selectedIncident.metrics?.memoryUsage != null ? `${selectedIncident.metrics.memoryUsage}%` : "No measurement"}
+                  </div>
+                </div>
+                <div style={{ padding: "10px", borderRadius: "6px", background: "rgba(15, 23, 42, 0.8)", border: "1px solid rgba(148, 163, 184, 0.15)" }}>
+                  <div style={{ color: "#94a3b8" }}>Active Requests</div>
+                  <div style={{ fontSize: "16px", fontWeight: 700, color: "#f8fafc" }}>
+                    {selectedIncident.metrics?.activeRequests != null ? `${selectedIncident.metrics.activeRequests}` : "No measurement"}
                   </div>
                 </div>
               </div>
@@ -280,23 +403,50 @@ export const IncidentsTab: React.FC<IncidentsTabProps> = ({
                 </div>
 
                 {mlResult ? (
-                  <div style={{ fontSize: "13px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
-                      <span style={{ color: "#94a3b8" }}>Predicted Breach Probability:</span>
-                      <span style={{ fontWeight: 700, color: mlResult.prediction === "VIOLATION" ? "#ef4444" : "#10b981" }}>
-                        {(mlResult.violationProbability * 100).toFixed(1)}% ({mlResult.prediction})
-                      </span>
+                  mlResult.status === "INSUFFICIENT_TELEMETRY" ? (
+                    <div style={{ padding: "8px 12px", backgroundColor: "#451a03", border: "1px solid #b45309", borderRadius: "6px", color: "#fef3c7", fontSize: "12px" }}>
+                      ⚠️ <strong>Insufficient telemetry for ML prediction</strong>
+                      {mlResult.missingFeatures && mlResult.missingFeatures.length > 0 && (
+                        <div style={{ marginTop: "4px", color: "#fde68a" }}>
+                          Missing required features: {mlResult.missingFeatures.join(", ")}
+                        </div>
+                      )}
                     </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
-                      <span style={{ color: "#94a3b8" }}>Model Architecture:</span>
-                      <span style={{ color: "#f8fafc", fontFamily: "monospace" }}>Logistic Regression (L2)</span>
-                    </div>
-                    {mlResult.topRiskFactors && (
-                      <div style={{ color: "#94a3b8", marginTop: "6px" }}>
-                        Top Risk Drivers: <span style={{ color: "#f8fafc" }}>{mlResult.topRiskFactors.join(", ")}</span>
+                  ) : (
+                    <div style={{ fontSize: "13px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+                        <span style={{ color: "#94a3b8" }}>Predicted Breach Probability:</span>
+                        <span style={{ fontWeight: 700, color: mlResult.prediction === "VIOLATION" ? "#ef4444" : "#10b981" }}>
+                          {(mlResult.violationProbability * 100).toFixed(1)}% ({mlResult.prediction})
+                        </span>
                       </div>
-                    )}
-                  </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+                        <span style={{ color: "#94a3b8" }}>Model & Version:</span>
+                        <span style={{ color: "#f8fafc", fontFamily: "monospace" }}>
+                          {mlResult.model || "logistic_regression"} ({mlResult.modelVersion || "2.0.0"})
+                        </span>
+                      </div>
+                      {mlResult.service && (
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+                          <span style={{ color: "#94a3b8" }}>Service Context:</span>
+                          <span style={{ color: "#38bdf8", fontFamily: "monospace" }}>{mlResult.service}</span>
+                        </div>
+                      )}
+                      {mlResult.featureTimestamp && (
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+                          <span style={{ color: "#94a3b8" }}>Telemetry Snapshot:</span>
+                          <span style={{ color: "#94a3b8", fontSize: "11px" }}>
+                            {new Date(mlResult.featureTimestamp).toLocaleTimeString()} (Prometheus Verified)
+                          </span>
+                        </div>
+                      )}
+                      {mlResult.topRiskFactors && (
+                        <div style={{ color: "#94a3b8", marginTop: "6px" }}>
+                          Top Risk Drivers: <span style={{ color: "#f8fafc" }}>{mlResult.topRiskFactors.join(", ")}</span>
+                        </div>
+                      )}
+                    </div>
+                  )
                 ) : (
                   <div style={{ fontSize: "13px", color: "#94a3b8" }}>
                     {hasMetrics

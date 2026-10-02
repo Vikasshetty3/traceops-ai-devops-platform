@@ -42,6 +42,7 @@ services:
       - PORT=5000
       - MONGODB_URI=mongodb://mongodb:27017/requirement_traceable_devops
       - ML_SERVICE_URL=http://ml-service:5001
+      - PROMETHEUS_URL=http://prometheus:9090
       - DEVOPS_PROVIDER=simulation
       - KUBERNETES_NAMESPACE=requirement-traceable-devops
       - GEMINI_API_KEY=${GEMINI_API_KEY}
@@ -70,6 +71,38 @@ services:
     networks:
       - traceops-network
 
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: traceops-cadvisor
+    restart: unless-stopped
+    privileged: true
+    command:
+      - -disable_metrics=disk,diskIO
+    volumes:
+      - /:/rootfs:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /sys:/sys:ro
+    ports:
+      - "8088:8080"
+    networks:
+      - traceops-network
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: traceops-node-exporter
+    restart: unless-stopped
+    ports:
+      - "9100:9100"
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    networks:
+      - traceops-network
+
   prometheus:
     image: prom/prometheus:v2.50.1
     container_name: traceops-prometheus
@@ -78,6 +111,11 @@ services:
       - "9090:9090"
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/rules:/etc/prometheus/rules:ro
+    depends_on:
+      - backend
+      - cadvisor
+      - node-exporter
     networks:
       - traceops-network
 

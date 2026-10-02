@@ -13,7 +13,7 @@ export interface FeatureScaler {
 
 export interface TrainedModelArtifact {
   modelType: "logistic_regression";
-  version: "1.0.0-research";
+  version: "2.0.0-production-telemetry";
   createdAt: string;
   randomSeed: number;
   featureNames: string[];
@@ -50,7 +50,6 @@ export class ModelTrainer {
     "p95Latency",
     "errorRate",
     "requestRate",
-    "dbPoolUsage",
     "deploymentChanged",
   ];
 
@@ -297,7 +296,7 @@ export class ModelTrainer {
 
     const artifact: TrainedModelArtifact = {
       modelType: "logistic_regression",
-      version: "1.0.0-research",
+      version: "2.0.0-production-telemetry",
       createdAt: new Date().toISOString(),
       randomSeed: seed,
       featureNames: this.featureNames,

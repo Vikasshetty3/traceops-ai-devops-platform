@@ -29,6 +29,7 @@ import {
   advanceCanaryDeployment,
   getCanaryDeploymentStatus,
   abortCanaryDeployment,
+  evaluateCanaryDeployment,
 } from "../controllers/repairController";
 
 const router = Router();
@@ -79,5 +80,6 @@ router.post("/deployments/:deploymentId/canary/start", startCanaryDeployment);
 router.post("/deployments/:deploymentId/canary/advance", advanceCanaryDeployment);
 router.get("/deployments/:deploymentId/canary/status", getCanaryDeploymentStatus);
 router.post("/deployments/:deploymentId/canary/abort", abortCanaryDeployment);
+router.post("/deployments/:deploymentId/canary/evaluate", evaluateCanaryDeployment);
 
 export default router;

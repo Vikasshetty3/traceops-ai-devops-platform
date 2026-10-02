@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import type { SLO, Requirement } from "../../types";
 import { StatusBadge } from "../common/StatusBadge";
 import { SectionHeader, EmptyState } from "../common/FeedbackStates";
-import { Plus, Trash2, Zap, Target } from "lucide-react";
+import { Plus, Trash2, Zap } from "lucide-react";
 
 interface SLOsTabProps {
   slos: SLO[];
@@ -120,53 +120,99 @@ export const SLOsTab: React.FC<SLOsTabProps> = ({
                 <th style={{ padding: "12px 16px" }}>Linked Requirement</th>
                 <th style={{ padding: "12px 16px" }}>Service</th>
                 <th style={{ padding: "12px 16px" }}>Target Formula</th>
-                <th style={{ padding: "12px 16px" }}>Availability Goal</th>
+                <th style={{ padding: "12px 16px" }}>Live Evaluation</th>
+                <th style={{ padding: "12px 16px" }}>Measured Value</th>
+                <th style={{ padding: "12px 16px" }}>Evaluated At</th>
                 <th style={{ padding: "12px 16px" }}>Severity</th>
-                <th style={{ padding: "12px 16px" }}>Status</th>
                 <th style={{ padding: "12px 16px", textAlign: "right" }}>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {slos.map((slo) => (
-                <tr key={slo.sloId} style={{ borderBottom: "1px solid rgba(148, 163, 184, 0.1)" }}>
-                  <td style={{ padding: "14px 16px", fontWeight: 600, color: "#38bdf8" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                      <Zap className="w-4 h-4 text-amber-400" />
-                      {slo.sloId}
-                    </div>
-                  </td>
-                  <td style={{ padding: "14px 16px", color: "#e2e8f0" }}>
-                    <span style={{ backgroundColor: "rgba(56, 189, 248, 0.1)", padding: "4px 8px", borderRadius: "4px", fontSize: "12px" }}>
-                      {slo.requirementId}
-                    </span>
-                  </td>
-                  <td style={{ padding: "14px 16px", color: "#f8fafc", fontWeight: 600 }}>{slo.service}</td>
-                  <td style={{ padding: "14px 16px", fontFamily: "monospace", color: "#f1f5f9" }}>
-                    {slo.metric} {slo.operator || ""} {slo.threshold != null ? slo.threshold : ""} {slo.unit || ""}
-                  </td>
-                  <td style={{ padding: "14px 16px", color: "#10b981", fontWeight: 600 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                      <Target className="w-3.5 h-3.5" />
-                      {slo.target != null ? `${slo.target}%` : "No target defined"} {slo.window ? `(${slo.window})` : ""}
-                    </div>
-                  </td>
-                  <td style={{ padding: "14px 16px" }}>
-                    <StatusBadge status={slo.severity} size="sm" />
-                  </td>
-                  <td style={{ padding: "14px 16px" }}>
-                    <StatusBadge status={slo.status} size="sm" />
-                  </td>
-                  <td style={{ padding: "14px 16px", textAlign: "right" }}>
-                    <button
-                      onClick={() => onDeleteSLO(slo.sloId)}
-                      style={{ background: "transparent", border: "none", color: "#64748b", cursor: "pointer", padding: "6px" }}
-                      title="Delete SLO"
-                    >
-                      <Trash2 className="w-4 h-4 hover:text-red-400" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {slos.map((slo) => {
+                const evalRec = slo.latestEvaluation;
+                const statusColor =
+                  evalRec?.status === "COMPLIANT"
+                    ? "#10b981"
+                    : evalRec?.status === "BREACHED"
+                    ? "#ef4444"
+                    : evalRec?.status === "NO_DATA"
+                    ? "#f59e0b"
+                    : evalRec?.status === "ERROR"
+                    ? "#f43f5e"
+                    : "#94a3b8";
+
+                const statusLabel =
+                  evalRec?.status === "COMPLIANT"
+                    ? "COMPLIANT"
+                    : evalRec?.status === "BREACHED"
+                    ? "BREACHED"
+                    : evalRec?.status === "NO_DATA"
+                    ? "NO DATA"
+                    : evalRec?.status === "ERROR"
+                    ? "MONITORING ERROR"
+                    : "PENDING";
+
+                return (
+                  <tr key={slo.sloId} style={{ borderBottom: "1px solid rgba(148, 163, 184, 0.1)" }}>
+                    <td style={{ padding: "14px 16px", fontWeight: 600, color: "#38bdf8" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                        <Zap className="w-4 h-4 text-amber-400" />
+                        {slo.sloId}
+                      </div>
+                    </td>
+                    <td style={{ padding: "14px 16px", color: "#e2e8f0" }}>
+                      <span style={{ backgroundColor: "rgba(56, 189, 248, 0.1)", padding: "4px 8px", borderRadius: "4px", fontSize: "12px" }}>
+                        {slo.requirementId}
+                      </span>
+                    </td>
+                    <td style={{ padding: "14px 16px", color: "#f8fafc", fontWeight: 600 }}>{slo.service}</td>
+                    <td style={{ padding: "14px 16px", fontFamily: "monospace", color: "#f1f5f9" }}>
+                      {slo.metric} {slo.operator || ""} {slo.threshold != null ? slo.threshold : ""} {slo.unit || ""}
+                    </td>
+                    <td style={{ padding: "14px 16px" }}>
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          padding: "3px 8px",
+                          borderRadius: "4px",
+                          fontSize: "11px",
+                          fontWeight: 700,
+                          backgroundColor: `${statusColor}22`,
+                          color: statusColor,
+                          border: `1px solid ${statusColor}44`,
+                        }}
+                      >
+                        {statusLabel}
+                      </span>
+                    </td>
+                    <td style={{ padding: "14px 16px", fontFamily: "monospace" }}>
+                      {evalRec && evalRec.actualValue !== null && evalRec.actualValue !== undefined ? (
+                        <span style={{ color: evalRec.status === "BREACHED" ? "#ef4444" : "#10b981", fontWeight: 600 }}>
+                          {evalRec.actualValue} {slo.unit || ""}
+                        </span>
+                      ) : (
+                        <span style={{ color: "#64748b" }}>null</span>
+                      )}
+                    </td>
+                    <td style={{ padding: "14px 16px", fontSize: "12px", color: "#94a3b8" }}>
+                      {evalRec?.evaluatedAt ? new Date(evalRec.evaluatedAt).toLocaleTimeString() : "—"}
+                    </td>
+                    <td style={{ padding: "14px 16px" }}>
+                      <StatusBadge status={slo.severity} size="sm" />
+                    </td>
+                    <td style={{ padding: "14px 16px", textAlign: "right" }}>
+                      <button
+                        onClick={() => onDeleteSLO(slo.sloId)}
+                        style={{ background: "transparent", border: "none", color: "#64748b", cursor: "pointer", padding: "6px" }}
+                        title="Delete SLO"
+                      >
+                        <Trash2 className="w-4 h-4 hover:text-red-400" />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

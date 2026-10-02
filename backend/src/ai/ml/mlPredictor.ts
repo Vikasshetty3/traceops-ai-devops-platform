@@ -1,6 +1,14 @@
+/**
+ * ML Predictor - Production Telemetry Model Adapter
+ * Replaces legacy synthetic scoring with genuine SLOViolationClassifier model inference.
+ */
+
+import { SLOViolationClassifier } from "../../../../ml-service/src/model";
+
 export interface MLPrediction {
   violationProbability: number;
   prediction: "VIOLATION" | "NO_VIOLATION";
+  factors?: Record<string, number>;
 }
 
 export const predictSLOViolation = (
@@ -8,37 +16,27 @@ export const predictSLOViolation = (
   memoryUsage: number,
   errorRate: number,
   latency: number,
-  deploymentChanged: number
+  deploymentChanged = 0,
+  requestRate = 0
 ): MLPrediction => {
-  let score = 0;
+  const result = SLOViolationClassifier.predict({
+    cpuUsage,
+    memoryUsage,
+    errorRate,
+    latency,
+    requestRate,
+    deploymentChanged,
+  });
 
-  if (cpuUsage > 80) {
-    score += 0.25;
+  if (result.status === "INSUFFICIENT_TELEMETRY") {
+    throw new Error(
+      `Insufficient telemetry for prediction: missing [${result.missingFeatures?.join(", ")}]`
+    );
   }
-
-  if (memoryUsage > 80) {
-    score += 0.20;
-  }
-
-  if (errorRate > 5) {
-    score += 0.25;
-  }
-
-  if (latency > 2) {
-    score += 0.30;
-  }
-
-  if (deploymentChanged === 1) {
-    score += 0.10;
-  }
-
-  const violationProbability = Math.min(score, 1);
 
   return {
-    violationProbability,
-    prediction:
-      violationProbability >= 0.5
-        ? "VIOLATION"
-        : "NO_VIOLATION",
+    violationProbability: result.violationProbability,
+    prediction: result.prediction,
+    factors: result.factors,
   };
 };

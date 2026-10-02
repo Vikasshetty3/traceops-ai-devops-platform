@@ -126,16 +126,58 @@ export class ProjectStorageService {
   }
 
   /**
-   * Safely resolves a relative path within a base directory, preventing path traversal.
+   * Safely resolves a relative path within a base directory, preventing path traversal,
+   * sibling-prefix collision, absolute path escape, and symlink breakouts.
    */
   public static safeResolvePath(baseDir: string, relativePath: string): string {
-    const sanitizedRel = relativePath.replace(/^(\.\.[\/\\])+/, "").trim();
-    const resolvedPath = path.resolve(baseDir, sanitizedRel);
+    if (!relativePath || typeof relativePath !== "string") {
+      throw new Error("Security Violation: Target path is required and must be a string");
+    }
+
+    const raw = relativePath.trim();
+
+    // 1. Reject null bytes and control characters
+    if (raw.includes("\0")) {
+      throw new Error("Security Violation: Null byte detected in path");
+    }
+
     const resolvedBase = path.resolve(baseDir);
 
-    if (!resolvedPath.startsWith(resolvedBase)) {
-      throw new Error(`Security Violation: Path traversal detected outside workspace: ${relativePath}`);
+    // 2. Reject absolute paths, UNC paths, and Windows drive letters
+    if (path.isAbsolute(raw) || /^([a-zA-Z]:|[\\\/]{2})/.test(raw)) {
+      throw new Error(`Security Violation: Absolute path traversal attempt blocked: ${raw}`);
     }
+
+    // 3. Resolve canonical path
+    const resolvedPath = path.resolve(resolvedBase, raw);
+
+    // 4. Verify canonical relative containment
+    const rel = path.relative(resolvedBase, resolvedPath);
+    if (rel.startsWith("..") || path.isAbsolute(rel)) {
+      throw new Error(`Security Violation: Path traversal detected outside workspace: ${raw}`);
+    }
+
+    // 5. Strict directory boundary enforcement (prevents sibling-prefix attacks like /workspace/REP-001-malicious)
+    const baseWithSep = resolvedBase.endsWith(path.sep) ? resolvedBase : resolvedBase + path.sep;
+    if (resolvedPath !== resolvedBase && !resolvedPath.startsWith(baseWithSep)) {
+      throw new Error(`Security Violation: Sibling-prefix path traversal detected: ${raw}`);
+    }
+
+    // 6. Symlink escape detection
+    if (fs.existsSync(resolvedPath)) {
+      try {
+        const realPath = fs.realpathSync(resolvedPath);
+        const realRel = path.relative(resolvedBase, realPath);
+        if (realRel.startsWith("..") || path.isAbsolute(realRel)) {
+          throw new Error(`Security Violation: Symlink escape detected outside workspace: ${raw}`);
+        }
+      } catch (err: any) {
+        if (err.message && err.message.includes("Security Violation")) {
+          throw err;
+        }
+      }
+    }
+
     return resolvedPath;
   }
 

@@ -17,12 +17,17 @@ import rcaRoutes from "./routes/rcaRoutes";
 import aiRcaRoutes from "./routes/aiRcaRoutes";
 import mlRoutes from "./routes/mlRoutes";
 import geminiRcaRoutes from "./routes/geminiRcaRoutes";
+import telemetryRoutes from "./routes/telemetryRoutes";
 import experimentRoutes from "./routes/experimentRoutes";
 import devopsRoutes from "./routes/devopsRoutes";
 import metricsRoutes from "./routes/metricsRoutes";
 import projectRoutes from "./routes/projectRoutes";
 import repairRoutes from "./routes/repairRoutes";
+import authRoutes from "./routes/authRoutes";
+import telemetryObservationRoutes from "./routes/telemetryObservationRoutes";
 import { getPrometheusMetrics } from "./controllers/metricsController";
+import { httpMetricsMiddleware } from "./services/telemetryInstrumentation";
+import { extractUser } from "./middleware/authMiddleware";
 
 const app = express();
 
@@ -30,6 +35,7 @@ const app = express();
 app.use(helmet());
 app.use(correlationIdMiddleware);
 app.use(requestLoggerMiddleware);
+app.use(httpMetricsMiddleware);
 
 app.use(
   cors({
@@ -40,8 +46,10 @@ app.use(
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(extractUser);
 
 // Core API endpoints
+app.use("/api/auth", authRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/requirements", requirementRoutes);
 app.use("/api/slos", sloRoutes);
@@ -55,7 +63,22 @@ app.use("/api/gemini-rca", geminiRcaRoutes);
 app.use("/api/experiments", experimentRoutes);
 app.use("/api/devops", devopsRoutes);
 app.use("/api/metrics", metricsRoutes);
+app.use("/api/telemetry", telemetryRoutes);
+app.use("/api/telemetry-observations", telemetryObservationRoutes);
 app.use("/api", repairRoutes);
+
+// Controlled test failure endpoint for genuine Prometheus runtime telemetry generation
+app.post("/api/test/failure-mode", (req, res) => {
+  const { statusCode = 500, message = "Database connection pool timeout on traceops-backend service" } = req.body || {};
+  const code = Number(statusCode) || 500;
+  console.error(`[traceops-backend] ERROR: HTTP ${code} Internal Server Error: ${message} - upstream gateway timeout`);
+  res.status(code).json({
+    success: false,
+    failureMode: true,
+    message,
+    timestamp: new Date().toISOString(),
+  });
+});
 
 // Prometheus scraper endpoint
 app.get("/metrics", getPrometheusMetrics);
@@ -83,6 +106,7 @@ app.get("/", (_req, res) => {
       devops: "/api/devops",
       repairs: "/api/repairs",
       deployments: "/api/deployments",
+      telemetryObservations: "/api/telemetry-observations",
     },
     frontend: "http://localhost:5173",
   });
