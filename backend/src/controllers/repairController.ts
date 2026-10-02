@@ -10,6 +10,7 @@ import { CodeRepairService } from "../services/codeRepairService";
 import { ValidationService } from "../services/validationService";
 import { DockerDeploymentProvider } from "../services/dockerDeploymentProvider";
 import { ProjectStorageService } from "../services/projectStorageService";
+import { RcaRepairContractService } from "../services/rcaRepairContractService";
 
 /**
  * Trigger static issue detection scan on a project
@@ -585,6 +586,76 @@ export const downloadLatestRepairedProject = async (req: Request, res: Response)
       success: false,
       message: "Failed to download latest repaired project",
       error: error instanceof Error ? error.message : error,
+    });
+  }
+};
+
+/**
+ * Phase 5.2 — Create runtime repair candidate from a genuine Prometheus SLO incident and evidence-backed RCA
+ * Endpoint: POST /api/incidents/:incidentId/repair
+ */
+export const createIncidentRepair = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const incidentId = String(req.params.incidentId);
+    const { rcaId } = req.body || {};
+    const caller = req.headers["x-user-id"] || req.headers.authorization || "DevOps Engineer";
+
+    const result = await RcaRepairContractService.createRepairCandidate(incidentId, {
+      rcaId,
+      caller: String(caller),
+    });
+
+    res.status(result.isExisting ? 200 : 201).json({
+      success: true,
+      message: result.isExisting
+        ? "Idempotent lookup: Active repair candidate already exists for this incident"
+        : result.actionMapping.isSupported
+        ? "Runtime repair candidate created successfully via bounded deterministic mapping"
+        : "Runtime advisory candidate created (RCA recommendation requires manual remediation)",
+      isExisting: result.isExisting,
+      repair: result.repair,
+      traceability: result.traceability,
+      snapshotHash: result.snapshotHash,
+      actionMapping: result.actionMapping,
+      data: {
+        repair: result.repair,
+        traceability: result.traceability,
+        snapshotHash: result.snapshotHash,
+        actionMapping: result.actionMapping,
+      },
+    });
+  } catch (error: any) {
+    const message = error instanceof Error ? error.message : String(error);
+    const isPreconditionFailure = message.includes("Precondition Failed") || message.includes("Security Shield");
+    const isNotFound = message.includes("not found");
+
+    const statusCode = isNotFound ? 404 : isPreconditionFailure ? 400 : 500;
+
+    res.status(statusCode).json({
+      success: false,
+      message,
+      error: message,
+    });
+  }
+};
+
+/**
+ * Phase 5.2 — Independently verify the immutable evidence snapshot stored on a repair candidate
+ * Endpoint: GET /api/repairs/:repairId/verify-evidence
+ */
+export const verifyRepairEvidence = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const repairId = String(req.params.repairId);
+    const result = await RcaRepairContractService.verifyEvidenceSnapshot(repairId);
+    res.status(result.isValid ? 200 : 400).json({
+      success: result.isValid,
+      data: result,
+      ...result,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : String(error),
     });
   }
 };

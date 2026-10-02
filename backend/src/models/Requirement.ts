@@ -49,8 +49,18 @@ const requirementSchema = new Schema<IRequirement>(
     },
     category: {
       type: String,
-      enum: ["performance", "availability", "reliability", "security"],
+      enum: [
+        "performance",
+        "availability",
+        "reliability",
+        "security",
+        "PERFORMANCE",
+        "AVAILABILITY",
+        "RELIABILITY",
+        "SECURITY",
+      ],
       default: "performance",
+      set: (v: string) => (v ? v.toLowerCase() : v),
     },
     metric: {
       type: String,

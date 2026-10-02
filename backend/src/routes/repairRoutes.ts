@@ -16,6 +16,8 @@ import {
   probeDeployment,
   downloadRepairedProject,
   downloadLatestRepairedProject,
+  createIncidentRepair,
+  verifyRepairEvidence,
 } from "../controllers/repairController";
 
 const router = Router();
@@ -31,8 +33,12 @@ router.get("/projects/:projectId/repairs/:repairId/download", downloadRepairedPr
 router.get("/issues/:issueId", getIssueById);
 router.post("/issues/:issueId/repair", createRepair);
 
+// Phase 5.2 — Incident-Driven RCA Repair Contract
+router.post("/incidents/:incidentId/repair", createIncidentRepair);
+
 // Repairs & Validation
 router.get("/repairs/:repairId", getRepairById);
+router.get("/repairs/:repairId/verify-evidence", verifyRepairEvidence);
 router.get("/repairs/:repairId/diff", getRepairDiff);
 router.post("/repairs/:repairId/validate", validateRepair);
 router.post("/repairs/:repairId/approve", approveRepair);
