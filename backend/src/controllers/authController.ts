@@ -10,15 +10,63 @@ import { CodeRepair } from "../models/CodeRepair";
 import { Deployment } from "../models/Deployment";
 import { DeploymentAuditEvent } from "../models/DeploymentAuditEvent";
 
+export const getAuthStatus = async (_req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const status = await AuthService.getAuthStatus();
+    res.status(200).json({
+      success: true,
+      ...status,
+      data: status,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to query authentication status",
+    });
+  }
+};
+
+export const initAdmin = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { username, email, password, name, initSecret } = req.body || {};
+    const result = await AuthService.initializeFirstAdmin({
+      username,
+      email,
+      password,
+      name,
+      initSecret,
+    });
+
+    res.status(201).json({
+      success: true,
+      message: `Primary administrator ${result.user.username} initialized successfully`,
+      user: result.user,
+      token: result.token,
+      data: result,
+    });
+  } catch (error: any) {
+    const message = error instanceof Error ? error.message : String(error);
+    const isForbidden = message.includes("Forbidden");
+    const isConflict = message.includes("Conflict");
+    res.status(isForbidden ? 403 : isConflict ? 409 : 400).json({
+      success: false,
+      message,
+      error: message,
+    });
+  }
+};
+
 export const signup = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const { username, email, password, name, role } = req.body || {};
+    const { username, email, password, name } = req.body || {};
+    // Public self-registration always provisions standard USER role
     const result = await AuthService.registerUser({
       username,
       email,
       password,
       name,
-      role: role === "ADMIN" ? "ADMIN" : "USER",
+      role: "USER",
+      allowAdminRole: false,
     });
 
     res.status(201).json({

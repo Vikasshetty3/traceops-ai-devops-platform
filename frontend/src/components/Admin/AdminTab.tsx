@@ -95,7 +95,7 @@ export const AdminTab: React.FC = () => {
           </div>
           <div className="kpi-content">
             <span className="kpi-title">Active Services</span>
-            <span className="kpi-value">{overview?.totalProjects ?? 27}</span>
+            <span className="kpi-value">{overview?.totalProjects ?? 0}</span>
             <span className="kpi-trend">Monitored Microservices</span>
           </div>
         </div>
@@ -215,29 +215,37 @@ export const AdminTab: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {users.map((u) => (
-                <tr key={u.userId}>
-                  <td>
-                    <div className="user-name-cell">
-                      <div className="avatar-circle">{u.name.charAt(0).toUpperCase()}</div>
-                      <span className="font-semibold">{u.name}</span>
-                    </div>
-                  </td>
-                  <td>
-                    <code>{u.username}</code>
-                  </td>
-                  <td>{u.email}</td>
-                  <td>
-                    <span className={`role-pill ${u.role.toLowerCase()}`}>
-                      {u.role === "ADMIN" ? "ADMINISTRATOR" : "NORMAL USER"}
-                    </span>
-                  </td>
-                  <td>
-                    <Clock className="w-3.5 h-3.5 inline mr-1 text-slate-400" />
-                    {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "Active"}
+              {users.length === 0 ? (
+                <tr>
+                  <td colSpan={5} style={{ textAlign: "center", padding: "32px", color: "#94a3b8" }}>
+                    No registered users in system.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                users.map((u) => (
+                  <tr key={u.userId}>
+                    <td>
+                      <div className="user-name-cell">
+                        <div className="avatar-circle">{u.name.charAt(0).toUpperCase()}</div>
+                        <span className="font-semibold">{u.name}</span>
+                      </div>
+                    </td>
+                    <td>
+                      <code>{u.username}</code>
+                    </td>
+                    <td>{u.email}</td>
+                    <td>
+                      <span className={`role-pill ${u.role.toLowerCase()}`}>
+                        {u.role === "ADMIN" ? "ADMINISTRATOR" : "NORMAL USER"}
+                      </span>
+                    </td>
+                    <td>
+                      <Clock className="w-3.5 h-3.5 inline mr-1 text-slate-400" />
+                      {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "Active"}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

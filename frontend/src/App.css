@@ -322,65 +322,6 @@ body {
   color: var(--text-primary);
 }
 
-.demo-credentials-banner {
-  background-color: rgba(56, 189, 248, 0.08);
-  border: 1px solid rgba(56, 189, 248, 0.2);
-  border-radius: 8px;
-  padding: 10px 12px;
-  margin-bottom: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.demo-label {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  color: var(--accent-sky);
-  letter-spacing: 0.04em;
-}
-
-.demo-btn-group {
-  display: flex;
-  gap: 8px;
-}
-
-.btn-demo-badge {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  border: 1px solid transparent;
-  transition: all 0.15s ease;
-}
-
-.btn-demo-badge.user {
-  background-color: rgba(56, 189, 248, 0.15);
-  color: var(--accent-sky);
-  border-color: rgba(56, 189, 248, 0.35);
-}
-
-.btn-demo-badge.user:hover {
-  background-color: rgba(56, 189, 248, 0.25);
-}
-
-.btn-demo-badge.admin {
-  background-color: rgba(245, 158, 11, 0.15);
-  color: var(--accent-amber);
-  border-color: rgba(245, 158, 11, 0.35);
-}
-
-.btn-demo-badge.admin:hover {
-  background-color: rgba(245, 158, 11, 0.25);
-}
-
 .auth-alert {
   display: flex;
   align-items: center;

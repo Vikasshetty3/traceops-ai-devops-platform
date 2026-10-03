@@ -32,6 +32,7 @@ const { CodeRepair } = require(path.join(__dirname, "../backend/dist/backend/src
 const { Deployment } = require(path.join(__dirname, "../backend/dist/backend/src/models/Deployment"));
 const { DeploymentAuditEvent } = require(path.join(__dirname, "../backend/dist/backend/src/models/DeploymentAuditEvent"));
 const { DeploymentLockService } = require(path.join(__dirname, "../backend/dist/backend/src/services/deploymentLockService"));
+const { AuthService } = require(path.join(__dirname, "../backend/dist/backend/src/services/authService"));
 
 const MONGO_URI = process.env.MONGO_URI || "mongodb://localhost:27017/requirement_traceable_devops";
 const BACKEND_URL = "http://localhost:5000";
@@ -162,36 +163,50 @@ async function runFinalE2EVerification() {
   // ---------------------------------------------------------------------------
   console.log("\n--- SECTION 2: Authentication & Secure Session Management ---");
   const testRunId = crypto.randomBytes(3).toString("hex");
+  const normalUsername = `devops_user_${testRunId}`;
+  const normalPassword = `SecurePassword_${testRunId}!`;
+  const adminUsername = `admin_e2e_${testRunId}`;
+  const adminPassword = `AdminSecurePassword_${testRunId}!`;
   let normalToken = "";
   let adminToken = "";
 
   try {
-    // 1. Signup new operator account
+    // 1. Signup new operator account (creates standard USER role)
     const signupRes = await requestJson(`${BACKEND_URL}/api/auth/signup`, {
       method: "POST",
       body: {
-        username: `devops_user_${testRunId}`,
+        username: normalUsername,
         email: `devops_${testRunId}@traceops.io`,
-        password: "SecurePassword123!",
+        password: normalPassword,
         name: `DevOps Engineer ${testRunId}`,
-        role: "USER",
       },
     });
     assert(signupRes.status === 201, `Expected 201 Created, got ${signupRes.status}`);
     assert(signupRes.json.success === true, "Signup indicates success");
     assert(Boolean(signupRes.json.token), "Signup returns JWT token");
-    pass("Operator Self-Registration (/api/auth/signup)", `Created user devops_user_${testRunId}`);
+    pass("Operator Self-Registration (/api/auth/signup)", `Created user ${normalUsername}`);
   } catch (e) {
     fail("Operator Self-Registration (/api/auth/signup)", e);
   }
 
   try {
-    // 2. Login as seeded Normal User
+    // 2. Ensure test admin account exists with dynamic credentials
+    const adminHash = await AuthService.hashPassword(adminPassword);
+    await User.create({
+      userId: `USR-ADMIN-${testRunId.toUpperCase()}`,
+      username: adminUsername,
+      email: `admin_${testRunId}@traceops.io`,
+      passwordHash: adminHash,
+      name: `Platform Administrator ${testRunId}`,
+      role: "ADMIN",
+    });
+
+    // 3. Login as Normal User
     const loginUser = await requestJson(`${BACKEND_URL}/api/auth/login`, {
       method: "POST",
       body: {
-        identifier: "user",
-        password: "user123",
+        identifier: normalUsername,
+        password: normalPassword,
       },
     });
     assert(loginUser.status === 200, `Expected 200 OK, got ${loginUser.status}`);
@@ -199,34 +214,34 @@ async function runFinalE2EVerification() {
     assert(loginUser.json.user.role === "USER", `Role must be USER, got ${loginUser.json.user.role}`);
     assert(Boolean(loginUser.json.token), "Login returns JWT token");
     normalToken = loginUser.json.token;
-    pass("Normal User Authentication (/api/auth/login)", `User "user" authenticated with role USER`);
+    pass("Normal User Authentication (/api/auth/login)", `User "${normalUsername}" authenticated with role USER`);
   } catch (e) {
     fail("Normal User Authentication (/api/auth/login)", e);
   }
 
   try {
-    // 3. Login as seeded Admin User
+    // 4. Login as Admin User
     const loginAdmin = await requestJson(`${BACKEND_URL}/api/auth/login`, {
       method: "POST",
       body: {
-        identifier: "admin",
-        password: "admin123",
+        identifier: adminUsername,
+        password: adminPassword,
       },
     });
     assert(loginAdmin.status === 200, `Expected 200 OK, got ${loginAdmin.status}`);
     assert(loginAdmin.json.user.role === "ADMIN", `Role must be ADMIN, got ${loginAdmin.json.user.role}`);
     adminToken = loginAdmin.json.token;
-    pass("Admin User Authentication (/api/auth/login)", `Admin "admin" authenticated with role ADMIN`);
+    pass("Admin User Authentication (/api/auth/login)", `Admin "${adminUsername}" authenticated with role ADMIN`);
   } catch (e) {
     fail("Admin User Authentication (/api/auth/login)", e);
   }
 
   try {
-    // 4. Invalid password rejection
+    // 5. Invalid password rejection
     const invalidLogin = await requestJson(`${BACKEND_URL}/api/auth/login`, {
       method: "POST",
       body: {
-        identifier: "admin",
+        identifier: adminUsername,
         password: "wrong_password_attempt",
       },
     });

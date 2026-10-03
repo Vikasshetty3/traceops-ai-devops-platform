@@ -343,8 +343,15 @@ export const api = {
       method: "POST",
       body: JSON.stringify(credentials),
     }),
-  signup: (data: { username: string; email: string; password: string; name: string; role?: "USER" | "ADMIN" }) =>
+  signup: (data: { username: string; email: string; password: string; name: string }) =>
     fetchJson<{ success: boolean; user: User; token: string; message: string }>(`${API_BASE}/auth/signup`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  getAuthStatus: () =>
+    fetchJson<{ success: boolean; adminInitialized: boolean; totalUsers: number }>(`${API_BASE}/auth/status`),
+  initAdmin: (data: { username: string; email: string; password: string; name?: string; initSecret?: string }) =>
+    fetchJson<{ success: boolean; user: User; token: string; message: string }>(`${API_BASE}/auth/init-admin`, {
       method: "POST",
       body: JSON.stringify(data),
     }),

@@ -19,9 +19,9 @@ export const SLOsTab: React.FC<SLOsTabProps> = ({
 }) => {
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState<Partial<SLO>>({
-    sloId: "SLO-001",
-    requirementId: requirements[0]?.requirementId || "REQ-001",
-    service: "Checkout",
+    sloId: "",
+    requirementId: requirements[0]?.requirementId || "",
+    service: requirements[0]?.service || "",
     metric: "p95_latency",
     operator: "<",
     threshold: 2.0,
@@ -35,8 +35,8 @@ export const SLOsTab: React.FC<SLOsTabProps> = ({
   const openNewModal = () => {
     setFormData({
       sloId: `SLO-${Math.floor(1000 + Math.random() * 9000)}`,
-      requirementId: requirements[0]?.requirementId || "REQ-001",
-      service: "Checkout",
+      requirementId: requirements[0]?.requirementId || "",
+      service: requirements[0]?.service || "",
       metric: "p95_latency",
       operator: "<",
       threshold: 2.0,

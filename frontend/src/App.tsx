@@ -47,7 +47,6 @@ import {
   Shield,
   LogIn,
   LogOut,
-  UserCheck,
 } from "lucide-react";
 import "./App.css";
 
@@ -60,15 +59,7 @@ export const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(() => {
     try {
       const stored = localStorage.getItem("traceops_user");
-      return stored
-        ? JSON.parse(stored)
-        : {
-            userId: "USR-001",
-            username: "user",
-            name: "DevOps Engineer",
-            email: "user@traceops.io",
-            role: "USER",
-          };
+      return stored ? JSON.parse(stored) : null;
     } catch {
       return null;
     }
@@ -88,7 +79,7 @@ export const App: React.FC = () => {
   const [telemetryLoading, setTelemetryLoading] = useState<boolean>(true);
   const [traceGraph, setTraceGraph] = useState<TraceGraphNode[]>([]);
   const [deployments, setDeployments] = useState<Deployment[]>([]);
-  const [selectedReqId, setSelectedReqId] = useState<string>("REQ-001");
+  const [selectedReqId, setSelectedReqId] = useState<string>("");
   const [repairProjectId, setRepairProjectId] = useState<string>("");
 
   // Fetch all primary datasets
@@ -123,6 +114,9 @@ export const App: React.FC = () => {
       }
       setTraceGraph(graph || []);
       setDeployments(deps || []);
+      if (reqs && reqs.length > 0) {
+        setSelectedReqId((prev) => prev || reqs[0].requirementId);
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to sync state with backend API.");
     } finally {
@@ -178,45 +172,6 @@ export const App: React.FC = () => {
       setUser(null);
       localStorage.removeItem("traceops_user");
       localStorage.removeItem("traceops_token");
-      if (activeTab === "admin") {
-        setActiveTab("overview");
-      }
-    }
-  };
-
-  const handleSwitchToAdminDemo = async () => {
-    try {
-      const res = await api.login({ identifier: "admin", password: "admin123" });
-      handleAuthSuccess(res.user, res.token);
-    } catch {
-      // Fallback local switch
-      const adminUser: User = {
-        userId: "USR-002",
-        username: "admin",
-        name: "Platform Administrator",
-        email: "admin@traceops.io",
-        role: "ADMIN",
-      };
-      setUser(adminUser);
-      localStorage.setItem("traceops_user", JSON.stringify(adminUser));
-    }
-  };
-
-  const handleSwitchToUserDemo = async () => {
-    try {
-      const res = await api.login({ identifier: "user", password: "user123" });
-      handleAuthSuccess(res.user, res.token);
-    } catch {
-      // Fallback local switch
-      const normalUser: User = {
-        userId: "USR-001",
-        username: "user",
-        name: "DevOps Engineer",
-        email: "user@traceops.io",
-        role: "USER",
-      };
-      setUser(normalUser);
-      localStorage.setItem("traceops_user", JSON.stringify(normalUser));
       if (activeTab === "admin") {
         setActiveTab("overview");
       }
@@ -355,26 +310,6 @@ export const App: React.FC = () => {
         </div>
 
         <div className="header-right">
-          {/* Quick Demo Switcher Buttons */}
-          <div className="demo-btn-group" style={{ marginRight: "4px" }}>
-            <button
-              onClick={handleSwitchToUserDemo}
-              className={`btn-demo-badge user ${user?.role === "USER" ? "active-role" : ""}`}
-              title="Switch session to Demo User (normal workspace)"
-            >
-              <UserCheck className="w-3.5 h-3.5" />
-              <span>User View</span>
-            </button>
-            <button
-              onClick={handleSwitchToAdminDemo}
-              className={`btn-demo-badge admin ${user?.role === "ADMIN" ? "active-role" : ""}`}
-              title="Switch session to Demo Admin (global visibility)"
-            >
-              <Shield className="w-3.5 h-3.5" />
-              <span>Admin View</span>
-            </button>
-          </div>
-
           {/* User Profile / Auth Status */}
           {user ? (
             <div className="user-profile-menu">

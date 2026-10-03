@@ -56,14 +56,14 @@ docker compose up -d --build
 
 ### Component Access Endpoints
 
-| Service | Endpoint | Purpose | Credentials |
+| Service | Endpoint | Purpose | Access Control |
 |---|---|---|---|
-| **TraceOps Web UI** | `http://localhost:5173` | React SaaS Application | `user` / `user123` or `admin` / `admin123` |
+| **TraceOps Web UI** | `http://localhost:5173` | React SaaS Application | User / Admin Authentication |
 | **TraceOps Backend** | `http://localhost:5000` | REST API Engine | JWT Authenticated |
-| **Prometheus** | `http://localhost:9090` | Observability & PromQL Metrics | Open |
-| **Grafana** | `http://localhost:3001` | Dashboard Visualizations | `admin` / `admin` |
+| **Prometheus** | `http://localhost:9090` | Observability & PromQL Metrics | Open / Scrape Target |
+| **Grafana** | `http://localhost:3001` | Dashboard Visualizations | Configured Operator Auth |
 | **ML Inference Service**| `http://localhost:5001` | Real-time Failure Prediction | Open (REST) |
-| **MongoDB** | `localhost:27017` | Persistent State Store | Open |
+| **MongoDB** | `localhost:27017` | Persistent State Store | Isolated Network |
 
 To shut down the fleet:
 ```bash
@@ -72,29 +72,54 @@ docker compose down
 
 ---
 
-## 🔐 Default Demo Accounts
+## 🔐 Platform Setup & Administrator Initialization
 
-| Role | Username | Password | Capabilities |
-|---|---|---|---|
-| **Normal User** | `user` | `user123` | Full core TraceOps workspace: Services, Requirements, SLOs, Telemetry, Incidents, RCA, Repairs, Validation, Approval, Deployment, Canary, Rollback, and Audit Trail. |
-| **Admin User** | `admin` | `admin123` | Everything a normal user has **PLUS** Global Admin Dashboard, User Management, Fleet-Wide Aggregations, and Platform Health Monitors. |
+TraceOps starts cleanly with **zero pre-seeded credentials or fake accounts**. The platform enforces an explicit, operator-driven first administrator initialization workflow:
+
+```text
+Fresh Installation
+       ↓
+No predefined users
+       ↓
+First administrator initialization
+       ↓
+Admin account created with credentials supplied during initialization
+       ↓
+Normal signup / login thereafter
+```
+
+### 1. Initialize First Administrator
+Upon first launch, initialize the primary administrator via either the Web UI or the secure CLI:
+
+**Via Web UI:**
+Open `http://localhost:5173`. When no administrator is configured, click **Sign In** → **Initialize Platform Administrator** and enter your chosen credentials.
+
+**Via CLI:**
+```bash
+node scripts/init_admin.js --username <admin_username> --email <admin_email> --password <secure_password>
+```
+
+*(Note: Passwords are automatically hashed with bcrypt using 10 salt rounds. Once an administrator is initialized, subsequent calls to the initialization endpoint are strictly locked with HTTP 403 Forbidden).*
+
+### 2. Create User Accounts
+Standard operators can self-register directly through the **Create Account** screen on the Web UI or via `POST /api/auth/signup`. Public registrations strictly default to standard `USER` role.
 
 ---
 
-## 🎬 35-Step Deterministic Live Demonstration Script
+## 🎬 Operational Workflow & Demonstration Guide
 
-TraceOps is designed for an end-to-end live demonstration without modifying MongoDB or altering source code:
+TraceOps enables a complete, authentic end-to-end DevOps closed loop without depending on pre-seeded demo records:
 
-1. **Launch Fleet:** Run `docker compose up -d --build`. Confirm all 8 containers report healthy status.
+1. **Launch Fleet:** Run `docker compose up -d --build`. Confirm all containers report healthy status.
 2. **Open UI:** Open `http://localhost:5173` in a browser.
-3. **Login:** Click **Login**, choose **Demo User** (`user` / `user123`).
+3. **Initialize / Sign In:** Sign in with your initialized administrator or registered user account.
 4. **Dashboard:** View platform operational KPIs, healthy/degraded service counts, active SLO compliance, and recent repairs.
-5. **Services Explorer:** Navigate to **Services** to view the microservice fleet (`PaymentGateway`, `OrderService`, `AuthService`).
-6. **Requirements:** Navigate to **Requirements**; inspect `REQ-001` (API response latency must remain <= 2.0s).
-7. **SLO Target:** Navigate to **SLOs**; observe `SLO-001` (p95 latency <= 2.0s derived from `REQ-001`).
+5. **Services Explorer:** Navigate to **Services** to view monitored microservices.
+6. **Define Requirements:** Navigate to **Requirements**; define an operational invariant (e.g. API response latency must remain <= 2.0s).
+7. **Create SLO Target:** Navigate to **SLOs**; create an SLO linked to the target requirement and microservice.
 8. **Live Telemetry:** Open **Monitoring**; observe live Prometheus scraping charts (CPU, RAM, request rate, p50/p95 latency).
 9. **Controlled Anomaly:** Trigger a controlled latency spike on the target microservice.
-10. **Telemetry Degradation:** Observe Prometheus charts reflect the spike above the 2.0s threshold.
+10. **Telemetry Degradation:** Observe Prometheus charts reflect the spike above the SLO threshold.
 11. **Organic Incident:** Navigate to **Incidents**; observe the newly generated incident with `source = PROMETHEUS_SLO_MONITOR`.
 12. **Incident Details:** Open the incident to inspect factual telemetry evidence snapshots and affected SLO metadata.
 13. **Gemini RCA:** Click **Run Root Cause Analysis**; observe Gemini 2.5 Flash synthesize logs and metrics into an evidence-grounded diagnosis and recommended repair action.
@@ -118,7 +143,7 @@ TraceOps is designed for an end-to-end live demonstration without modifying Mong
 31. **Batch B Rollback:** Observe the automated rollback engine restore the verified predecessor container with zero downtime.
 32. **Audit Trail Verification:** Open the **Audit Trail** tab; observe the cryptographic timeline tracking every transition from `CANARY_INITIALIZED` to `TRAFFIC_ABORTED`.
 33. **Cryptographic Proof:** Click **Verify Chain Integrity**; confirm that all SHA-256 parent links and event hashes are 100% mathematically valid.
-34. **Admin Console:** Switch to **Admin** role (`admin` / `admin123`); open **Admin Console** to inspect platform-wide metrics and user management.
+34. **Admin Console:** Log in with an **Admin** role account; open **Admin Console** to inspect platform-wide metrics and user management.
 35. **Verification Complete:** Complete demonstration concluded with full closed-loop traceability and zero data fabrication.
 
 ---
@@ -157,9 +182,12 @@ node tests/test_phase5_3_batch_c5_canary_abort_rollback.js
 
 # Final E2E: Complete SaaS Fleet Integration & Demo Readiness (18 passed)
 node tests/test_final_e2e_verification.js
+
+# Fresh Installation Verification: Zero Demo Data, First Admin Init, RBAC & REST (12 passed)
+node tests/test_fresh_installation_verification.js
 ```
 
-### Overall Regression Status: **449 / 449 PASSED (100%)**
+### Overall Regression Status: **461 / 461 PASSED (100%)** *(449 Phase 5 Fleet Tests + 12 Zero-Demo Fresh Install Tests; 1 Symlink Test Skipped on Windows)*
 
 ---
 

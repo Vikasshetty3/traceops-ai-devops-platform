@@ -1,10 +1,12 @@
 import { Router } from "express";
-import { signup, login, getCurrentUser, logout, getAllUsers, getAdminOverview } from "../controllers/authController";
+import { signup, login, getCurrentUser, logout, getAllUsers, getAdminOverview, getAuthStatus, initAdmin } from "../controllers/authController";
 import { requireAuth, requireAdmin } from "../middleware/authMiddleware";
 
 const router = Router();
 
 // Public auth endpoints
+router.get("/status", getAuthStatus);
+router.post("/init-admin", initAdmin);
 router.post("/signup", signup);
 router.post("/login", login);
 router.post("/logout", logout);

@@ -1,12 +1,12 @@
 import app from "./app";
 import { connectDatabase } from "./config/database";
 import { env } from "./config/env";
-import { seedDatabase } from "./config/seed";
+import { initializeDatabaseSchema } from "./config/seed";
 import { sloMonitoringDaemon } from "./services/sloMonitoringDaemon";
 
 const startServer = async (): Promise<void> => {
   await connectDatabase();
-  await seedDatabase();
+  await initializeDatabaseSchema();
 
   const server = app.listen(env.PORT, () => {
     console.log(`Backend server running on http://localhost:${env.PORT}`);

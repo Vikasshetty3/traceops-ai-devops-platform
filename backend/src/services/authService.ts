@@ -59,12 +59,51 @@ export class AuthService {
     }
   }
 
+  public static async getAuthStatus(): Promise<{ adminInitialized: boolean; totalUsers: number }> {
+    const [adminCount, totalUsers] = await Promise.all([
+      User.countDocuments({ role: "ADMIN" }),
+      User.countDocuments(),
+    ]);
+    return {
+      adminInitialized: adminCount > 0,
+      totalUsers,
+    };
+  }
+
+  public static async initializeFirstAdmin(params: {
+    username: string;
+    email: string;
+    password: string;
+    name?: string;
+    initSecret?: string;
+  }): Promise<AuthResult> {
+    const adminCount = await User.countDocuments({ role: "ADMIN" });
+    if (adminCount > 0) {
+      throw new Error("Forbidden: Administrator has already been initialized on this instance");
+    }
+
+    const requiredSecret = process.env.ADMIN_INIT_SECRET;
+    if (requiredSecret && params.initSecret !== requiredSecret) {
+      throw new Error("Forbidden: Invalid administrator initialization secret");
+    }
+
+    return this.registerUser({
+      username: params.username,
+      email: params.email,
+      password: params.password,
+      name: params.name || "System Administrator",
+      role: "ADMIN",
+      allowAdminRole: true,
+    });
+  }
+
   public static async registerUser(params: {
     username: string;
     email: string;
     password: string;
     name: string;
     role?: "USER" | "ADMIN";
+    allowAdminRole?: boolean;
   }): Promise<AuthResult> {
     const username = params.username.trim().toLowerCase();
     const email = params.email.trim().toLowerCase();
@@ -94,6 +133,7 @@ export class AuthService {
 
     const passwordHash = await this.hashPassword(params.password);
     const userId = `USR-${crypto.randomBytes(6).toString("hex").toUpperCase()}`;
+    const assignedRole = params.role === "ADMIN" && params.allowAdminRole ? "ADMIN" : "USER";
 
     const user = new User({
       userId,
@@ -101,7 +141,7 @@ export class AuthService {
       email,
       passwordHash,
       name: params.name.trim() || username,
-      role: params.role || "USER",
+      role: assignedRole,
     });
 
     await user.save();
