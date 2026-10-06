@@ -71,6 +71,14 @@ export interface IDeployment extends Document {
     reason?: string;
   }>;
 
+  // Phase 5.3 Batch C4: Prometheus Progressive Gating
+  prometheusVerificationState?: "WAITING_FOR_BAKE" | "VERIFYING_PROMETHEUS" | "GATE_PASSED" | "GATE_FAILED" | "IDLE";
+  latestObservedValue?: number | null;
+  gateSampleCount?: number;
+  requiredGateSamples?: number;
+  latestGateVerdict?: "ALLOW" | "BLOCK" | "PENDING";
+  latestGateReason?: string;
+
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -189,6 +197,20 @@ const deploymentSchema = new Schema<IDeployment>(
         reason: { type: String },
       },
     ],
+    // Phase 5.3 Batch C4: Prometheus Progressive Gating
+    prometheusVerificationState: {
+      type: String,
+      enum: ["WAITING_FOR_BAKE", "VERIFYING_PROMETHEUS", "GATE_PASSED", "GATE_FAILED", "IDLE"],
+      default: "IDLE",
+    },
+    latestObservedValue: { type: Number },
+    gateSampleCount: { type: Number, default: 0 },
+    requiredGateSamples: { type: Number, default: 0 },
+    latestGateVerdict: {
+      type: String,
+      enum: ["ALLOW", "BLOCK", "PENDING"],
+    },
+    latestGateReason: { type: String },
   },
   {
     timestamps: true,

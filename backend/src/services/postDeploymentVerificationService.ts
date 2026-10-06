@@ -414,6 +414,7 @@ export class PostDeploymentVerificationService {
       try {
         await this.runDocker([...baseArgs, "--network", "requirement-traceable-devops_traceops-network", predecessorImage]);
       } catch {
+        await this.runDocker(["rm", "-f", predecessorContainer]).catch(() => {});
         await this.runDocker([...baseArgs, predecessorImage]);
       }
 

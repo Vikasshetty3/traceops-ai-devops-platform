@@ -1,5 +1,6 @@
 import { Deployment, IDeployment } from "../models/Deployment";
 import { CodeRepair } from "../models/CodeRepair";
+import { SLO } from "../models/SLO";
 import { TrafficRoutingService, ActiveRoute } from "./trafficRoutingService";
 import { DeploymentLockService, DeploymentLockConflictError } from "./deploymentLockService";
 import { DeploymentAuditService } from "./deploymentAuditService";
@@ -173,7 +174,15 @@ export interface AdvanceCanaryParams {
     skipPrometheusGate?: boolean;
     forcePrometheusUnavailable?: boolean;
     forceInsufficientTelemetry?: boolean;
+    forceTargetDown?: boolean;
+    forceStaleTelemetry?: boolean;
     forceBreachValue?: number;
+    minSamples?: number;
+    sampleIntervalMs?: number;
+    promQl?: string;
+    target?: number;
+    operator?: string;
+    auditSamples?: boolean;
   };
 }
 
@@ -202,6 +211,16 @@ export interface CanaryStageStatus {
     status: string;
     reason?: string;
   }>;
+  // Phase 5.3 Batch C4 additions
+  prometheusVerificationState?: "WAITING_FOR_BAKE" | "VERIFYING_PROMETHEUS" | "GATE_PASSED" | "GATE_FAILED" | "IDLE";
+  sampleCount?: number;
+  requiredSampleCount?: number;
+  latestObservedValue?: number | null;
+  target?: number;
+  operator?: string;
+  gateResult?: "ALLOW" | "BLOCK" | "PENDING";
+  abortReason?: string | null;
+  rollbackState?: string | null;
 }
 
 export class CanaryProgressionService {
@@ -422,6 +441,10 @@ export class CanaryProgressionService {
     const elapsedSeconds = Math.max(0, (now.getTime() - enteredAt.getTime()) / 1000);
 
     if (elapsedSeconds < requiredBakeSeconds && !params.options?.skipBakeCheck) {
+      await Deployment.updateOne(
+        { deploymentId },
+        { $set: { prometheusVerificationState: "WAITING_FOR_BAKE" } }
+      );
       const remainingSeconds = Math.ceil(requiredBakeSeconds - elapsedSeconds);
       const error: any = new Error(
         `Bake Duration Incomplete: Stage ${currentStageName} requires ${requiredBakeSeconds}s stabilization window, but only ${Math.floor(elapsedSeconds)}s elapsed (${remainingSeconds}s remaining).`
@@ -430,33 +453,88 @@ export class CanaryProgressionService {
       throw error;
     }
 
-    // 5.5. Automated Canary Analysis (ACA) & Prometheus Metric Gating (Phase 5.3 Batch C4)
-    const shouldRunGate =
-      params.options?.enablePrometheusGate === true ||
-      (process.env.ENABLE_CANARY_PROMETHEUS_GATE === "true" && !params.options?.skipPrometheusGate);
-
-    if (shouldRunGate) {
-      const evaluation = await AutomatedCanaryAnalysisService.evaluateCanaryStage(deploymentId, {
-        actor,
-        forcePrometheusUnavailable: params.options?.forcePrometheusUnavailable,
-        forceInsufficientTelemetry: params.options?.forceInsufficientTelemetry,
-        forceBreachValue: params.options?.forceBreachValue,
-      });
-
-      if (!evaluation.passed) {
-        const error: any = new Error(
-          `Canary Gating Blocked: Stage ${currentStageName} failed Prometheus automated analysis: ${evaluation.reason} (Outcome: ${evaluation.outcome}). Progression halted.`
-        );
-        error.statusCode = 412; // Precondition Failed
-        error.evaluation = evaluation;
-        throw error;
-      }
-    }
-
-    // 6. Concurrency Protection via DeploymentLockService
+    // 5.5. Concurrency Protection via DeploymentLockService (Acquire before Prometheus gate & transition)
     await DeploymentLockService.acquireLock(deployment.service, deployment.repairId);
 
     try {
+      // Automated Canary Analysis (ACA) & Prometheus Metric Gating (Phase 5.3 Batch C4)
+      const repair = await CodeRepair.findOne({ repairId: deployment.repairId });
+      const shouldRunGate =
+        !params.options?.skipPrometheusGate &&
+        (params.options?.enablePrometheusGate === true ||
+          process.env.ENABLE_CANARY_PROMETHEUS_GATE === "true" ||
+          Boolean(repair?.sloId));
+
+      if (shouldRunGate) {
+        await Deployment.updateOne(
+          { deploymentId },
+          { $set: { prometheusVerificationState: "VERIFYING_PROMETHEUS" } }
+        );
+
+        const evaluation = await AutomatedCanaryAnalysisService.evaluateCanaryStage(deploymentId, {
+          actor,
+          forcePrometheusUnavailable: params.options?.forcePrometheusUnavailable,
+          forceInsufficientTelemetry: params.options?.forceInsufficientTelemetry,
+          forceTargetDown: params.options?.forceTargetDown,
+          forceStaleTelemetry: params.options?.forceStaleTelemetry,
+          forceBreachValue: params.options?.forceBreachValue,
+          minSamples: params.options?.minSamples,
+          sampleIntervalMs: params.options?.sampleIntervalMs,
+          promQl: params.options?.promQl,
+          target: params.options?.target,
+          operator: params.options?.operator,
+          auditSamples: params.options?.auditSamples,
+        });
+
+        if (!evaluation.passed) {
+          await Deployment.updateOne(
+            { deploymentId },
+            {
+              $set: {
+                prometheusVerificationState: "GATE_FAILED",
+                latestObservedValue: evaluation.actualValue,
+                gateSampleCount: evaluation.sampleCount,
+                latestGateVerdict: "BLOCK",
+                latestGateReason: evaluation.reason,
+              },
+            }
+          );
+
+          // Fail-Closed: Automatic abort and Batch B rollback on gate failure
+          await CanaryRollbackIntegrationService.executeCanaryAbort(deploymentId, {
+            reason: `Canary Gating Blocked: Stage ${currentStageName} failed Prometheus automated analysis: ${evaluation.reason} (Outcome: ${evaluation.outcome})`,
+            actor,
+            trigger:
+              evaluation.outcome === "SLO_BREACH"
+                ? "AUTOMATED_ACA_BREACH"
+                : evaluation.outcome === "PROMETHEUS_UNAVAILABLE"
+                ? "PROMETHEUS_UNAVAILABLE"
+                : "EMERGENCY_DEGRADATION",
+          });
+
+          const error: any = new Error(
+            `Canary Gating Blocked: Stage ${currentStageName} failed Prometheus automated analysis: ${evaluation.reason} (Outcome: ${evaluation.outcome}). Progression halted and canary aborted.`
+          );
+          error.statusCode = 412; // Precondition Failed
+          error.evaluation = evaluation;
+          throw error;
+        }
+
+        await Deployment.updateOne(
+          { deploymentId },
+          {
+            $set: {
+              prometheusVerificationState: "GATE_PASSED",
+              latestObservedValue: evaluation.actualValue,
+              gateSampleCount: evaluation.sampleCount,
+              latestGateVerdict: "ALLOW",
+              latestGateReason: evaluation.reason,
+            },
+          }
+        );
+      }
+
+      // 6. Stage advancement and traffic weights
       const reason = params.reason || `Advanced from ${currentStageName} to ${targetStage}`;
       const isCompleted = targetStage === "COMPLETED";
       const nextBakeDuration = params.options?.durationOverrides?.[targetStage] !== undefined
@@ -608,6 +686,31 @@ export class CanaryProgressionService {
     const isBakeComplete = elapsedBakeSeconds >= requiredBakeDurationSeconds;
     const canAdvance = isBakeComplete && stageDef.nextStage !== null && canaryStatus === "IN_PROGRESS";
 
+    // C4: Resolve target and operator for status reporting
+    const repairForStatus = await CodeRepair.findOne({ repairId: deployment.repairId });
+    let slo = repairForStatus?.sloId ? await SLO.findOne({ sloId: repairForStatus.sloId }) : null;
+    if (!slo) {
+      slo = await SLO.findOne({ projectId: deployment.projectId, service: deployment.service, status: "ACTIVE" });
+    }
+    const target = slo?.target ?? slo?.threshold ?? 2.0;
+    const operator = slo?.operator ?? "<=";
+
+    const prometheusVerificationState =
+      deployment.prometheusVerificationState ||
+      (canaryStatus === "ABORTED"
+        ? "GATE_FAILED"
+        : !isBakeComplete
+        ? "WAITING_FOR_BAKE"
+        : "IDLE");
+
+    const gateResult =
+      deployment.latestGateVerdict ||
+      (canaryStatus === "ABORTED"
+        ? "BLOCK"
+        : prometheusVerificationState === "GATE_PASSED"
+        ? "ALLOW"
+        : "PENDING");
+
     return {
       deploymentId,
       strategy,
@@ -623,6 +726,15 @@ export class CanaryProgressionService {
       nextStage: stageDef.nextStage,
       canAdvance,
       history: deployment.canaryStages || [],
+      prometheusVerificationState,
+      sampleCount: deployment.gateSampleCount ?? 0,
+      requiredSampleCount: deployment.requiredGateSamples ?? 3,
+      latestObservedValue: deployment.latestObservedValue ?? null,
+      target,
+      operator,
+      gateResult,
+      abortReason: deployment.rollbackReason || deployment.latestGateReason || null,
+      rollbackState: deployment.rollbackStatus || (canaryStatus === "ABORTED" ? "ROLLED_BACK_SUCCESSFULLY" : null),
     };
   }
 

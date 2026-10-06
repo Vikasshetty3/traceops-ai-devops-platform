@@ -139,6 +139,22 @@ export class CanaryRollbackIntegrationService {
           verificationStatus: "ABORTED",
         });
         auditEventId = auditEvent.eventId;
+
+        await DeploymentAuditService.appendEvent({
+          deploymentId,
+          action: "CANARY_ABORTED",
+          actor,
+          repairId: repair.repairId,
+          projectId: deployment.projectId,
+          service: deployment.service,
+          candidateCommitSha: deployment.candidateCommitSha || repair.candidateCommitSha,
+          candidateImage: deployment.candidateImage,
+          predecessorImage: deployment.predecessorImage,
+          evidenceSnapshotHash: repair.evidenceSnapshotHash,
+          stage: "ABORTED",
+          newCandidateWeight: 0,
+          verificationStatus: "ABORTED",
+        });
       } catch (auditErr) {
         console.error("[CanaryRollbackIntegrationService] Audit event notice:", auditErr);
       }

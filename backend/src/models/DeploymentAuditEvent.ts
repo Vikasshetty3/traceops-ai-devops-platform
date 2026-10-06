@@ -24,6 +24,11 @@ export interface IDeploymentAuditEvent extends Document {
     | "STAGE_ADVANCED"
     | "SLO_VERIFIED"
     | "SLO_BREACH_DETECTED"
+    | "PROMETHEUS_GATE_STARTED"
+    | "PROMETHEUS_SAMPLE_RECORDED"
+    | "PROMETHEUS_GATE_PASSED"
+    | "PROMETHEUS_GATE_FAILED"
+    | "CANARY_ABORTED"
     | "TRAFFIC_ABORTED"
     | "ROLLBACK_INITIATED"
     | "ROLLBACK_COMPLETED"
@@ -152,6 +157,11 @@ const deploymentAuditEventSchema = new Schema<IDeploymentAuditEvent>(
         "STAGE_ADVANCED",
         "SLO_VERIFIED",
         "SLO_BREACH_DETECTED",
+        "PROMETHEUS_GATE_STARTED",
+        "PROMETHEUS_SAMPLE_RECORDED",
+        "PROMETHEUS_GATE_PASSED",
+        "PROMETHEUS_GATE_FAILED",
+        "CANARY_ABORTED",
         "TRAFFIC_ABORTED",
         "ROLLBACK_INITIATED",
         "ROLLBACK_COMPLETED",
