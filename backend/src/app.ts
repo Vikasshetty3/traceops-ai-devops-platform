@@ -15,6 +15,7 @@ import sloEvaluationRoutes from "./routes/sloEvaluationRoutes";
 import incidentRoutes from "./routes/incidentRoutes";
 import rcaRoutes from "./routes/rcaRoutes";
 import aiRcaRoutes from "./routes/aiRcaRoutes";
+import mlGovernanceRoutes from "./routes/mlGovernanceRoutes";
 import mlRoutes from "./routes/mlRoutes";
 import geminiRcaRoutes from "./routes/geminiRcaRoutes";
 import telemetryRoutes from "./routes/telemetryRoutes";
@@ -58,6 +59,7 @@ app.use("/api/slo-evaluation", sloEvaluationRoutes);
 app.use("/api/incidents", incidentRoutes);
 app.use("/api/rca", rcaRoutes);
 app.use("/api/ai-rca", aiRcaRoutes);
+app.use("/api/ml/governance", mlGovernanceRoutes);
 app.use("/api/ml", mlRoutes);
 app.use("/api/gemini-rca", geminiRcaRoutes);
 app.use("/api/experiments", experimentRoutes);
@@ -102,6 +104,7 @@ app.get("/", (_req, res) => {
       rca: "/api/rca",
       geminiRca: "/api/gemini-rca/analyze",
       mlPredict: "/api/ml/predict",
+      mlGovernance: "/api/ml/governance",
       experiments: "/api/experiments",
       devops: "/api/devops",
       repairs: "/api/repairs",

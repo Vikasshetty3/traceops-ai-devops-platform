@@ -50,7 +50,15 @@ export interface AppendAuditEventParams {
     | "ROLLBACK_COMPLETED"
     | "PROMOTION_FINALIZED"
     | "DEPLOY_START"
-    | "DEPLOY_SUCCESS";
+    | "DEPLOY_SUCCESS"
+    // Phase 5.3 Batch D1: Model Governance Lifecycle Actions
+    | "MODEL_REGISTERED"
+    | "MODEL_EVALUATION_RECORDED"
+    | "MODEL_VALIDATION_PASSED"
+    | "MODEL_VALIDATION_FAILED"
+    | "MODEL_APPROVAL_REQUESTED"
+    | "MODEL_APPROVED"
+    | "MODEL_REJECTED";
   promQl?: string;
   observedValue?: number | null;
   threshold?: number;
@@ -59,6 +67,37 @@ export interface AppendAuditEventParams {
   actor: string;
   authorizationCheck?: boolean;
   evidenceSnapshotHash?: string;
+  parentEventHash?: string;
+  // Model optional fields
+  modelId?: string;
+  modelVersion?: string;
+  artifactSHA256?: string;
+  datasetId?: string;
+  evaluationId?: string;
+  approvalId?: string;
+  validationSummary?: string;
+}
+
+export interface AppendModelAuditEventParams {
+  eventId?: string;
+  timestamp?: Date | string;
+  sequenceNumber?: number;
+  modelId: string;
+  modelVersion: string;
+  artifactSHA256: string;
+  datasetId?: string;
+  evaluationId?: string;
+  approvalId?: string;
+  validationSummary?: string;
+  action:
+    | "MODEL_REGISTERED"
+    | "MODEL_EVALUATION_RECORDED"
+    | "MODEL_VALIDATION_PASSED"
+    | "MODEL_VALIDATION_FAILED"
+    | "MODEL_APPROVAL_REQUESTED"
+    | "MODEL_APPROVED"
+    | "MODEL_REJECTED";
+  actor: string;
   parentEventHash?: string;
 }
 
@@ -102,6 +141,25 @@ export class DeploymentAuditService {
   public static extractCanonicalPayload(event: any): Record<string, any> {
     const rawTs = event.timestamp || new Date();
     const ts = rawTs instanceof Date ? rawTs.toISOString() : new Date(rawTs).toISOString();
+
+    // Batch D1: Model Governance canonical payload
+    if (event.modelId) {
+      return {
+        action: String(event.action),
+        actor: String(event.actor),
+        approvalId: event.approvalId ? String(event.approvalId) : null,
+        artifactSHA256: event.artifactSHA256 ? String(event.artifactSHA256) : null,
+        datasetId: event.datasetId ? String(event.datasetId) : null,
+        evaluationId: event.evaluationId ? String(event.evaluationId) : null,
+        eventId: String(event.eventId),
+        modelId: String(event.modelId),
+        modelVersion: String(event.modelVersion || ""),
+        parentEventHash: String(event.parentEventHash || event.previousEventHash || GENESIS_HASH),
+        sequenceNumber: Number(event.sequenceNumber),
+        timestamp: ts,
+        validationSummary: event.validationSummary ? String(event.validationSummary) : null,
+      };
+    }
 
     return {
       action: String(event.action),
@@ -307,6 +365,183 @@ export class DeploymentAuditService {
    */
   public static async verifyChain(deploymentId: string): Promise<ChainVerificationResult> {
     const events = await DeploymentAuditEvent.find({ deploymentId }).sort({ sequenceNumber: 1 });
+
+    if (events.length === 0) {
+      return {
+        valid: true,
+        eventCount: 0,
+        firstInvalidEventId: null,
+      };
+    }
+
+    for (let i = 0; i < events.length; i++) {
+      const current = events[i];
+      const expectedSequence = i + 1;
+
+      // 1. Sequence Continuity Verification
+      if (current.sequenceNumber !== expectedSequence) {
+        return {
+          valid: false,
+          eventCount: events.length,
+          firstInvalidEventId: current.eventId,
+          reason: `SEQUENCE_GAP_OR_REORDER: expected sequence ${expectedSequence}, found ${current.sequenceNumber}`,
+        };
+      }
+
+      // 2. Parent Hash Linkage Verification
+      const expectedParentHash = i === 0 ? GENESIS_HASH : events[i - 1].eventHash;
+      if (current.parentEventHash !== expectedParentHash) {
+        return {
+          valid: false,
+          eventCount: events.length,
+          firstInvalidEventId: current.eventId,
+          reason: `PARENT_HASH_MISMATCH: expected parent ${expectedParentHash}, found ${current.parentEventHash}`,
+        };
+      }
+
+      // 3. Payload and Event Hash Integrity Verification
+      const normalizedPayload = DeploymentAuditService.extractCanonicalPayload(current);
+      const canonicalJson = DeploymentAuditService.canonicalStringify(normalizedPayload);
+      const computedHash = DeploymentAuditService.calculateEventHash(current.parentEventHash, canonicalJson);
+
+      if (computedHash !== current.eventHash) {
+        return {
+          valid: false,
+          eventCount: events.length,
+          firstInvalidEventId: current.eventId,
+          reason: `EVENT_HASH_MISMATCH: computed hash ${computedHash} does not match stored hash ${current.eventHash}`,
+        };
+      }
+    }
+
+    return {
+      valid: true,
+      eventCount: events.length,
+      firstInvalidEventId: null,
+    };
+  }
+
+  /**
+   * Appends a new model governance audit event to the model's cryptographic audit chain.
+   * Enforces deterministic sequential parent-hash linkage, canonical serialization,
+   * SHA-256 event hashing, and immutable append-only persistence.
+   */
+  public static async appendModelEvent(params: AppendModelAuditEventParams): Promise<IDeploymentAuditEvent> {
+    const { modelId, modelVersion, artifactSHA256, action, actor } = params;
+
+    if (!modelId) {
+      throw new Error("Audit Safety Violation: modelId is required");
+    }
+    if (!modelVersion) {
+      throw new Error("Audit Safety Violation: modelVersion is required");
+    }
+    if (!artifactSHA256) {
+      throw new Error("Audit Safety Violation: artifactSHA256 is required");
+    }
+    if (!actor) {
+      throw new Error("Audit Safety Violation: actor is required");
+    }
+    if (!action) {
+      throw new Error("Audit Safety Violation: action is required");
+    }
+
+    // Determine sequenceNumber and parentEventHash for this model's audit chain
+    const latestEvent = await DeploymentAuditEvent.findOne({ modelId })
+      .sort({ sequenceNumber: -1 })
+      .lean();
+
+    let sequenceNumber: number;
+    let parentEventHash: string;
+
+    if (!latestEvent) {
+      sequenceNumber = 1;
+      parentEventHash = GENESIS_HASH;
+    } else {
+      sequenceNumber = latestEvent.sequenceNumber + 1;
+      parentEventHash = latestEvent.eventHash;
+    }
+
+    if (params.sequenceNumber !== undefined && params.sequenceNumber !== sequenceNumber) {
+      throw new Error(
+        `Audit Chain Violation: Sequence number mismatch. Expected: ${sequenceNumber}, Provided: ${params.sequenceNumber}`
+      );
+    }
+    if (params.parentEventHash && params.parentEventHash !== parentEventHash) {
+      throw new Error(
+        `Audit Chain Violation: Parent event hash mismatch. Expected: ${parentEventHash}, Provided: ${params.parentEventHash}`
+      );
+    }
+
+    const eventId = params.eventId || `audit-mdl-${crypto.randomBytes(8).toString("hex")}`;
+    const timestamp = params.timestamp ? new Date(params.timestamp) : new Date();
+
+    const rawPayload = {
+      action,
+      actor,
+      approvalId: params.approvalId,
+      artifactSHA256,
+      datasetId: params.datasetId,
+      evaluationId: params.evaluationId,
+      eventId,
+      modelId,
+      modelVersion,
+      parentEventHash,
+      sequenceNumber,
+      timestamp,
+      validationSummary: params.validationSummary,
+      // Deployment compatibility fields
+      deploymentId: modelId,
+      repairId: "MODEL_GOVERNANCE",
+      projectId: "TRACE-OPS-ML",
+      service: "ml-service",
+      candidateCommitSha: "HEAD",
+      predecessorImage: "none",
+      candidateImage: modelVersion,
+      stage: "MODEL_GOVERNANCE",
+      strategy: "DIRECT" as const,
+      previousCandidateWeight: 0,
+      newCandidateWeight: 0,
+      evidenceSnapshotHash: artifactSHA256,
+      authorizationCheck: true,
+    };
+
+    const canonicalPayload = DeploymentAuditService.extractCanonicalPayload(rawPayload);
+    const canonicalJson = DeploymentAuditService.canonicalStringify(canonicalPayload);
+    const eventHash = DeploymentAuditService.calculateEventHash(parentEventHash, canonicalJson);
+
+    const auditDoc = new DeploymentAuditEvent({
+      ...rawPayload,
+      previousEventHash: parentEventHash,
+      eventHash,
+    });
+
+    await auditDoc.save();
+
+    // Update MLModelRegistry if record exists
+    try {
+      const { MLModelRegistry } = await import("../models/MLModelRegistry");
+      await MLModelRegistry.updateOne({ modelId }, { $set: { lastAuditEventId: eventId } });
+    } catch (_err) {
+      // Non-blocking
+    }
+
+    return auditDoc;
+  }
+
+  /**
+   * Loads all audit events for a model in strictly ascending sequence order.
+   */
+  public static async getModelEvents(modelId: string): Promise<IDeploymentAuditEvent[]> {
+    return DeploymentAuditEvent.find({ modelId }).sort({ sequenceNumber: 1 });
+  }
+
+  /**
+   * Cryptographically verifies the integrity of the entire audit chain for a model.
+   * Reconstructs every canonical payload and recomputes every SHA-256 hash.
+   * Fails closed upon any discrepancy (tampered payload, parent mismatch, sequence gap).
+   */
+  public static async verifyModelChain(modelId: string): Promise<ChainVerificationResult> {
+    const events = await DeploymentAuditEvent.find({ modelId }).sort({ sequenceNumber: 1 });
 
     if (events.length === 0) {
       return {

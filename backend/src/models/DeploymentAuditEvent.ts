@@ -34,7 +34,15 @@ export interface IDeploymentAuditEvent extends Document {
     | "ROLLBACK_COMPLETED"
     | "PROMOTION_FINALIZED"
     | "DEPLOY_START"
-    | "DEPLOY_SUCCESS";
+    | "DEPLOY_SUCCESS"
+    // Phase 5.3 Batch D1: Model Governance Lifecycle Actions
+    | "MODEL_REGISTERED"
+    | "MODEL_EVALUATION_RECORDED"
+    | "MODEL_VALIDATION_PASSED"
+    | "MODEL_VALIDATION_FAILED"
+    | "MODEL_APPROVAL_REQUESTED"
+    | "MODEL_APPROVED"
+    | "MODEL_REJECTED";
   promQl?: string;                   // PromQL expression used
   observedValue?: number | null;     // Measured Prometheus metric
   threshold?: number;                // SLO threshold
@@ -46,6 +54,16 @@ export interface IDeploymentAuditEvent extends Document {
   parentEventHash: string;           // SHA-256 of preceding audit event in chain (genesis: 64 zeros)
   previousEventHash?: string;        // Alias for parentEventHash
   eventHash: string;                 // SHA-256(parentEventHash + ":" + canonicalPayload)
+
+  // Phase 5.3 Batch D1: ML Model Governance Fields
+  modelId?: string;
+  modelVersion?: string;
+  artifactSHA256?: string;
+  datasetId?: string;
+  evaluationId?: string;
+  approvalId?: string;
+  validationSummary?: string;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -168,6 +186,14 @@ const deploymentAuditEventSchema = new Schema<IDeploymentAuditEvent>(
         "PROMOTION_FINALIZED",
         "DEPLOY_START",
         "DEPLOY_SUCCESS",
+        // Batch D1
+        "MODEL_REGISTERED",
+        "MODEL_EVALUATION_RECORDED",
+        "MODEL_VALIDATION_PASSED",
+        "MODEL_VALIDATION_FAILED",
+        "MODEL_APPROVAL_REQUESTED",
+        "MODEL_APPROVED",
+        "MODEL_REJECTED",
       ],
       required: true,
     },
@@ -219,6 +245,37 @@ const deploymentAuditEventSchema = new Schema<IDeploymentAuditEvent>(
       trim: true,
       index: true,
     },
+
+    // Batch D1: Model Governance Fields
+    modelId: {
+      type: String,
+      trim: true,
+      index: true,
+    },
+    modelVersion: {
+      type: String,
+      trim: true,
+    },
+    artifactSHA256: {
+      type: String,
+      trim: true,
+    },
+    datasetId: {
+      type: String,
+      trim: true,
+    },
+    evaluationId: {
+      type: String,
+      trim: true,
+    },
+    approvalId: {
+      type: String,
+      trim: true,
+    },
+    validationSummary: {
+      type: String,
+      trim: true,
+    },
   },
   {
     timestamps: true,
@@ -228,6 +285,7 @@ const deploymentAuditEventSchema = new Schema<IDeploymentAuditEvent>(
 
 // Compound Index for deterministic ordered queries
 deploymentAuditEventSchema.index({ deploymentId: 1, sequenceNumber: 1 }, { unique: true });
+deploymentAuditEventSchema.index({ modelId: 1, sequenceNumber: 1 });
 deploymentAuditEventSchema.index({ service: 1, timestamp: -1 });
 
 // Virtual for alias previousEventHash <-> parentEventHash

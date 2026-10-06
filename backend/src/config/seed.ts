@@ -13,6 +13,10 @@ import { Incident } from "../models/Incident";
 import { User } from "../models/User";
 import { Deployment } from "../models/Deployment";
 import { DeploymentAuditEvent } from "../models/DeploymentAuditEvent";
+import { MLModelRegistry } from "../models/MLModelRegistry";
+import { MLDatasetVersion } from "../models/MLDatasetVersion";
+import { MLModelEvaluation } from "../models/MLModelEvaluation";
+import { MLModelApproval } from "../models/MLModelApproval";
 
 export const initializeDatabaseSchema = async (): Promise<void> => {
   try {
@@ -24,6 +28,10 @@ export const initializeDatabaseSchema = async (): Promise<void> => {
       Incident.createIndexes().catch(() => {}),
       Deployment.createIndexes().catch(() => {}),
       DeploymentAuditEvent.createIndexes().catch(() => {}),
+      MLModelRegistry.createIndexes().catch(() => {}),
+      MLDatasetVersion.createIndexes().catch(() => {}),
+      MLModelEvaluation.createIndexes().catch(() => {}),
+      MLModelApproval.createIndexes().catch(() => {}),
     ]);
   } catch (error) {
     console.error("Schema initialization notice:", error);
