@@ -1,0 +1,180 @@
+{
+  "modelVersion": "3.1.0-real-runtime-training",
+  "status": "CANDIDATE",
+  "baselineVersion": "2.0.0-production-telemetry",
+  "predecessorVersion": "3.0.0-real-runtime-training",
+  "algorithm": "class_weighted_logistic_regression",
+  "schemaVersion": "v2-production-telemetry",
+  "featureNames": [
+    "cpuUsage",
+    "memoryUsage",
+    "p95Latency",
+    "errorRate",
+    "requestRate",
+    "deploymentChanged"
+  ],
+  "scaler": {
+    "cpuUsage": {
+      "mean": 7.5024,
+      "stdDev": 1.8496
+    },
+    "memoryUsage": {
+      "mean": 15.9726,
+      "stdDev": 1.2913
+    },
+    "p95Latency": {
+      "mean": 1.5912,
+      "stdDev": 1.6794
+    },
+    "errorRate": {
+      "mean": 33.764,
+      "stdDev": 31.802
+    },
+    "requestRate": {
+      "mean": 0.5115,
+      "stdDev": 0.9343
+    },
+    "deploymentChanged": {
+      "mean": 0,
+      "stdDev": 1
+    }
+  },
+  "coefficients": {
+    "cpuUsage": 1.5399,
+    "memoryUsage": 0.4088,
+    "p95Latency": 0.8489,
+    "errorRate": 1.8496,
+    "requestRate": 1.344,
+    "deploymentChanged": 0
+  },
+  "intercept": 4.534,
+  "threshold": 0.5,
+  "trainingConfig": {
+    "epochs": 500,
+    "batchSize": 32,
+    "learningRate": 0.05,
+    "learningRateDecay": 0.001,
+    "l2Regularization": 0.01,
+    "weightMethod": "balanced_inverse_frequency",
+    "classWeights": {
+      "healthyWeight": 6.1563,
+      "violationWeight": 0.5442
+    },
+    "iterationsCompleted": 500,
+    "convergenceStatus": "COMPLETED_MAX_EPOCHS",
+    "initialLoss": 0.69315,
+    "finalLoss": 0.35376,
+    "deterministic": true,
+    "frozenOperationalThreshold": 0.5,
+    "operationalObjective": "Objective A - Detection Sensitive with False Negative Minimization"
+  },
+  "datasetSummary": {
+    "totalSamples": 845,
+    "trainCount": 591,
+    "validationCount": 127,
+    "testCount": 127,
+    "nonViolationCount": 229,
+    "violationCount": 616,
+    "temporalSpanHours": 86.51,
+    "distinctDaysCount": 3,
+    "distinctServicesCount": 18,
+    "distinctSlosCount": 139,
+    "distinctRequirementsCount": 114,
+    "dateRange": {
+      "start": "2026-09-27T11:01:59.150Z",
+      "end": "2026-10-01T01:32:23.550Z"
+    }
+  },
+  "datasetProvenance": {
+    "sourceTypes": [
+      "TELEMETRY_OBSERVATION",
+      "PROMETHEUS_SLO_MONITOR"
+    ],
+    "earliestTimestamp": "2026-09-27T11:01:59.150Z",
+    "latestTimestamp": "2026-10-01T01:32:23.550Z",
+    "leakageOverlap": 0,
+    "chronologicalOrderValid": true,
+    "datasetFingerprint": "82ed6c1af4be3909"
+  },
+  "metrics": {
+    "train": {
+      "sampleCount": 591,
+      "accuracy": 0.9932,
+      "precision": 1,
+      "recall": 0.9926,
+      "f1Score": 0.9963,
+      "rocAuc": 0.9947,
+      "logLoss": 0.1117,
+      "confusionMatrix": {
+        "truePositive": 539,
+        "falsePositive": 0,
+        "trueNegative": 48,
+        "falseNegative": 4
+      }
+    },
+    "validation": {
+      "sampleCount": 127,
+      "accuracy": 0.5354,
+      "precision": 0.4914,
+      "recall": 1,
+      "f1Score": 0.659,
+      "rocAuc": 0.2023,
+      "logLoss": 4.1613,
+      "confusionMatrix": {
+        "truePositive": 57,
+        "falsePositive": 59,
+        "trueNegative": 11,
+        "falseNegative": 0
+      }
+    },
+    "test": {
+      "sampleCount": 127,
+      "accuracy": 1,
+      "precision": 1,
+      "recall": 1,
+      "f1Score": 1,
+      "rocAuc": 1,
+      "logLoss": 0.2927,
+      "confusionMatrix": {
+        "truePositive": 16,
+        "falsePositive": 0,
+        "trueNegative": 111,
+        "falseNegative": 0
+      }
+    },
+    "baselineComparison": {
+      "candidate": {
+        "sampleCount": 127,
+        "accuracy": 1,
+        "precision": 1,
+        "recall": 1,
+        "f1Score": 1,
+        "rocAuc": 1,
+        "logLoss": 0.2927,
+        "confusionMatrix": {
+          "truePositive": 16,
+          "falsePositive": 0,
+          "trueNegative": 111,
+          "falseNegative": 0
+        }
+      },
+      "production": {
+        "sampleCount": 127,
+        "accuracy": 0.8819,
+        "precision": 1,
+        "recall": 0.0625,
+        "f1Score": 0.1176,
+        "rocAuc": 1,
+        "logLoss": 0.1746,
+        "confusionMatrix": {
+          "truePositive": 1,
+          "falsePositive": 0,
+          "trueNegative": 111,
+          "falseNegative": 15
+        }
+      }
+    }
+  },
+  "createdAt": "2026-10-01T01:57:25.998Z",
+  "checksumSha256": "9a06cdb000aaadaf589718f853ffa4e35f1b6f1d872e5d189048084fa8d72f6d"
+}

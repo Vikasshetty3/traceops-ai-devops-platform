@@ -69,11 +69,47 @@ export interface ModelMetadata {
     f1Score: number;
     rocAuc: number;
   };
+  artifactSHA256?: string;
+  servingStatus?: string;
 }
 
 export class SLOViolationClassifier {
-  public static readonly MODEL_VERSION = "2.0.0-production-telemetry";
+  public static readonly BASELINE_MODEL_VERSION = "2.0.0-production-telemetry";
+  public static readonly BASELINE_ARTIFACT_SHA256 =
+    "74460AC69D6C8B507955081943620817E96C9F9631D7BA81EB30A400BD86EC49";
   public static readonly FEATURE_SCHEMA_VERSION = "v2-production-telemetry";
+
+  // Active production model runtime state (authoritative serving identity)
+  private static activeModelVersion = "2.0.0-production-telemetry";
+  private static activeArtifactSHA256 =
+    "74460AC69D6C8B507955081943620817E96C9F9631D7BA81EB30A400BD86EC49";
+  private static activeServingStatus: "LIVE_SERVING" = "LIVE_SERVING";
+  private static activeArtifactPath = "data/trained_model.json";
+  private static activeThreshold = 0.5;
+
+  public static get MODEL_VERSION(): string {
+    return this.activeModelVersion;
+  }
+
+  public static getActiveModelVersion(): string {
+    return this.activeModelVersion;
+  }
+
+  public static getActiveArtifactSHA(): string {
+    return this.activeArtifactSHA256;
+  }
+
+  public static getActiveServingStatus(): string {
+    return this.activeServingStatus;
+  }
+
+  public static getActiveArtifactPath(): string {
+    return this.activeArtifactPath;
+  }
+
+  public static getActiveThreshold(): number {
+    return this.activeThreshold;
+  }
 
   // Production runtime feature schema (6 genuine dimensions)
   public static readonly FEATURE_NAMES = [
@@ -117,8 +153,46 @@ export class SLOViolationClassifier {
 
   /**
    * Initializes or reloads model weights from disk if available.
+   * Checks for active model pointer first, then falls back to baseline trained_model.json.
    */
   public static loadTrainedModel(customPath?: string): boolean {
+    // 1. Check if an active model pointer exists on disk
+    const pointerCandidates = [
+      path.join(__dirname, "../data/active_model.json"),
+      path.join(__dirname, "../../data/active_model.json"),
+      path.resolve(process.cwd(), "data/active_model.json"),
+      path.resolve(process.cwd(), "ml-service/data/active_model.json"),
+    ];
+    for (const pointerPath of pointerCandidates) {
+      if (fs.existsSync(pointerPath)) {
+        try {
+          const pointerRaw = fs.readFileSync(pointerPath, "utf-8");
+          const pointer = JSON.parse(pointerRaw);
+          if (pointer.activeModelVersion && pointer.artifactPath && pointer.artifactSHA256) {
+            const artifactCandidates = [
+              pointer.artifactPath,
+              path.resolve(process.cwd(), pointer.artifactPath),
+              path.join(__dirname, "../../", pointer.artifactPath),
+              path.join(__dirname, "../", pointer.artifactPath),
+            ];
+            for (const ap of artifactCandidates) {
+              if (fs.existsSync(ap)) {
+                const artRaw = fs.readFileSync(ap, "utf-8");
+                const artData = JSON.parse(artRaw);
+                if (artData.coefficients && artData.scaler) {
+                  this.setActiveProductionModel(artData, pointer.artifactPath, pointer.artifactSHA256);
+                  return true;
+                }
+              }
+            }
+          }
+        } catch (_err) {
+          // fallback to baseline
+        }
+      }
+    }
+
+    // 2. Fall back to standard trained_model.json
     const candidates = [
       customPath,
       path.join(__dirname, "../data/trained_model.json"),
@@ -136,6 +210,11 @@ export class SLOViolationClassifier {
             this.coefficients = data.coefficients;
             this.scaler = data.scaler;
             this.intercept = data.intercept ?? this.intercept;
+            this.activeThreshold = data.threshold ?? 0.5;
+            this.activeModelVersion = data.modelVersion || this.BASELINE_MODEL_VERSION;
+            this.activeArtifactPath = "data/trained_model.json";
+            this.activeArtifactSHA256 = this.BASELINE_ARTIFACT_SHA256;
+            this.activeServingStatus = "LIVE_SERVING";
             if (data.metrics?.test) {
               this.metrics = data.metrics.test;
             }
@@ -147,6 +226,71 @@ export class SLOViolationClassifier {
       }
     }
     return false;
+  }
+
+  /**
+   * Atomically cuts over serving state to a newly promoted model.
+   */
+  public static setActiveProductionModel(modelData: any, artifactPath: string, artifactSHA: string): void {
+    if (!modelData || !modelData.coefficients || !modelData.scaler) {
+      throw new Error("Invalid model data: coefficients and scaler are required for activation");
+    }
+    this.coefficients = { ...modelData.coefficients };
+    this.scaler = { ...modelData.scaler };
+    this.intercept = modelData.intercept !== undefined ? modelData.intercept : this.intercept;
+    this.activeThreshold = modelData.threshold !== undefined ? modelData.threshold : 0.5;
+    this.activeModelVersion = modelData.modelVersion || this.activeModelVersion;
+    this.activeArtifactSHA256 = artifactSHA;
+    this.activeArtifactPath = artifactPath;
+    this.activeServingStatus = "LIVE_SERVING";
+    if (modelData.metrics?.test) {
+      this.metrics = modelData.metrics.test;
+    }
+  }
+
+  /**
+   * Resets serving state back to baseline production model 2.0.0.
+   */
+  public static resetToProductionBaseline(): void {
+    this.scaler = {
+      cpuUsage: { mean: 57.251, stdDev: 23.6062 },
+      memoryUsage: { mean: 61.0501, stdDev: 19.3402 },
+      p95Latency: { mean: 1.396, stdDev: 1.3867 },
+      errorRate: { mean: 1.7345, stdDev: 3.1949 },
+      requestRate: { mean: 575.8207, stdDev: 470.7501 },
+      deploymentChanged: { mean: 0.2427, stdDev: 0.4287 },
+    };
+    this.coefficients = {
+      cpuUsage: 1.0218,
+      memoryUsage: 0.7703,
+      p95Latency: 2.0426,
+      errorRate: 1.0764,
+      requestRate: 0.2723,
+      deploymentChanged: 0.3708,
+    };
+    this.intercept = -2.1771;
+    this.metrics = {
+      accuracy: 0.9967,
+      precision: 0.9903,
+      recall: 1.0,
+      f1Score: 0.9951,
+      rocAuc: 1.0,
+    };
+    this.activeThreshold = 0.5;
+    this.activeModelVersion = this.BASELINE_MODEL_VERSION;
+    this.activeArtifactSHA256 = this.BASELINE_ARTIFACT_SHA256;
+    this.activeArtifactPath = "data/trained_model.json";
+    this.activeServingStatus = "LIVE_SERVING";
+    // Also remove active_model.json pointer if present
+    const pointerCandidates = [
+      path.resolve(process.cwd(), "data/active_model.json"),
+      path.resolve(process.cwd(), "ml-service/data/active_model.json"),
+    ];
+    for (const p of pointerCandidates) {
+      if (fs.existsSync(p)) {
+        try { fs.unlinkSync(p); } catch (_e) {}
+      }
+    }
   }
 
   /**
@@ -272,7 +416,7 @@ export class SLOViolationClassifier {
     const sigmoid = (z: number) => 1 / (1 + Math.exp(-Math.max(-25, Math.min(25, z))));
     const prob = sigmoid(logitZ);
     const violationProbability = Number(prob.toFixed(4));
-    const isViolation = violationProbability >= 0.5;
+    const isViolation = violationProbability >= this.activeThreshold;
 
     // Identify top positive risk factors
     const topRiskFactors = Object.entries(contributions)
@@ -318,8 +462,10 @@ export class SLOViolationClassifier {
   public static getModelInfo(): ModelMetadata {
     return {
       modelType: "logistic_regression",
-      version: this.MODEL_VERSION,
+      version: this.activeModelVersion,
       schemaVersion: this.FEATURE_SCHEMA_VERSION,
+      artifactSHA256: this.activeArtifactSHA256,
+      servingStatus: this.activeServingStatus,
       features: [...this.FEATURE_NAMES],
       coefficients: { ...this.coefficients },
       intercept: this.intercept,
@@ -423,7 +569,7 @@ export class SLOViolationClassifier {
           for (const file of files) {
             try {
               const content = JSON.parse(fs.readFileSync(path.join(dir, file), "utf-8"));
-              if (content.modelVersion && content.status === "CANDIDATE" && !seenCandidateVersions.has(content.modelVersion)) {
+              if (content.modelVersion && content.status === "CANDIDATE" && !seenCandidateVersions.has(content.modelVersion) && content.modelVersion !== this.activeModelVersion) {
                 seenCandidateVersions.add(content.modelVersion);
                 registry.push({
                   version: content.modelVersion,
@@ -443,7 +589,7 @@ export class SLOViolationClassifier {
       }
     }
 
-    if (this.candidateModel && !seenCandidateVersions.has(this.candidateModel.modelVersion)) {
+    if (this.candidateModel && !seenCandidateVersions.has(this.candidateModel.modelVersion) && this.candidateModel.modelVersion !== this.activeModelVersion) {
       registry.push({
         version: this.candidateModel.modelVersion,
         status: "CANDIDATE",

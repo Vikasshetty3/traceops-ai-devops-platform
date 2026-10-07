@@ -58,7 +58,15 @@ export interface AppendAuditEventParams {
     | "MODEL_VALIDATION_FAILED"
     | "MODEL_APPROVAL_REQUESTED"
     | "MODEL_APPROVED"
-    | "MODEL_REJECTED";
+    | "MODEL_REJECTED"
+    // Phase 5.3 Batch D2: Model Promotion Lifecycle Actions
+    | "MODEL_PROMOTION_VALIDATION_STARTED"
+    | "MODEL_PROMOTION_GATE_PASSED"
+    | "MODEL_PROMOTION_GATE_FAILED"
+    | "MODEL_PROMOTION_APPROVED"
+    | "MODEL_PROMOTION_STARTED"
+    | "MODEL_PROMOTED"
+    | "MODEL_PROMOTION_FAILED";
   promQl?: string;
   observedValue?: number | null;
   threshold?: number;
@@ -89,6 +97,11 @@ export interface AppendModelAuditEventParams {
   evaluationId?: string;
   approvalId?: string;
   validationSummary?: string;
+  // Batch D2: Promotion fields
+  predecessorModelId?: string;
+  predecessorVersion?: string;
+  predecessorArtifactSHA256?: string;
+  promotionPolicyVersion?: string;
   action:
     | "MODEL_REGISTERED"
     | "MODEL_EVALUATION_RECORDED"
@@ -96,7 +109,14 @@ export interface AppendModelAuditEventParams {
     | "MODEL_VALIDATION_FAILED"
     | "MODEL_APPROVAL_REQUESTED"
     | "MODEL_APPROVED"
-    | "MODEL_REJECTED";
+    | "MODEL_REJECTED"
+    | "MODEL_PROMOTION_VALIDATION_STARTED"
+    | "MODEL_PROMOTION_GATE_PASSED"
+    | "MODEL_PROMOTION_GATE_FAILED"
+    | "MODEL_PROMOTION_APPROVED"
+    | "MODEL_PROMOTION_STARTED"
+    | "MODEL_PROMOTED"
+    | "MODEL_PROMOTION_FAILED";
   actor: string;
   parentEventHash?: string;
 }
@@ -489,6 +509,11 @@ export class DeploymentAuditService {
       sequenceNumber,
       timestamp,
       validationSummary: params.validationSummary,
+      // Batch D2 promotion fields
+      predecessorModelId: params.predecessorModelId,
+      predecessorVersion: params.predecessorVersion,
+      predecessorArtifactSHA256: params.predecessorArtifactSHA256,
+      promotionPolicyVersion: params.promotionPolicyVersion,
       // Deployment compatibility fields
       deploymentId: modelId,
       repairId: "MODEL_GOVERNANCE",

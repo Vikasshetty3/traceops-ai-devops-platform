@@ -46,6 +46,39 @@ app.get("/models", (_req: Request, res: Response) => {
   });
 });
 
+app.post("/internal/hot-swap", (req: Request, res: Response) => {
+  try {
+    const { modelData, artifactPath, artifactSHA } = req.body || {};
+    if (!modelData || !artifactPath || !artifactSHA) {
+      return res.status(400).json({
+        success: false,
+        error: "modelData, artifactPath, and artifactSHA are required",
+      });
+    }
+    SLOViolationClassifier.setActiveProductionModel(modelData, artifactPath, artifactSHA);
+    return res.status(200).json({
+      success: true,
+      message: `Model ${modelData.modelVersion} activated successfully`,
+      activeModel: SLOViolationClassifier.getModelInfo(),
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/internal/reset-baseline", (_req: Request, res: Response) => {
+  try {
+    SLOViolationClassifier.resetToProductionBaseline();
+    return res.status(200).json({
+      success: true,
+      message: "Reset to production baseline successfully",
+      activeModel: SLOViolationClassifier.getModelInfo(),
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.post("/predict", (req: Request, res: Response): void => {
   try {
     const {

@@ -11,6 +11,9 @@ import {
   registerDataset,
   listDatasets,
   getDataset,
+  getPromotionReadiness,
+  promoteModel,
+  getPromotionStatus,
 } from "../controllers/mlGovernanceController";
 import { requireAuth, requireAdmin } from "../middleware/authMiddleware";
 
@@ -28,6 +31,11 @@ router.post("/models/:modelId/evaluations", recordEvaluation);
 // Approval Workflow
 router.post("/models/:modelId/approval/request", requestApproval);
 router.post("/models/:modelId/approval", requireAuth, requireAdmin, reviewApproval);
+
+// Batch D2: Model Promotion & Safety Gates
+router.get("/models/:modelId/promotion-readiness", requireAuth, getPromotionReadiness);
+router.post("/models/:modelId/promote", requireAuth, requireAdmin, promoteModel);
+router.get("/models/:modelId/promotion-status", requireAuth, getPromotionStatus);
 
 // Audit Trail & Cryptographic Chain Verification
 router.get("/models/:modelId/audit", getModelAudit);

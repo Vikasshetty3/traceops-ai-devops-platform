@@ -36,7 +36,10 @@ export class MLClient {
       if (response.ok) {
         const json: any = await response.json();
         if (json.data) {
-          return json.data;
+          const expectedVersion = SLOViolationClassifier.getActiveModelVersion();
+          if (!json.data.modelVersion || json.data.modelVersion === expectedVersion) {
+            return json.data;
+          }
         }
       }
     } catch (_err) {

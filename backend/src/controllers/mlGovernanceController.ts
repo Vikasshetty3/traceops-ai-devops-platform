@@ -1,5 +1,7 @@
 import { Request, Response } from "express";
 import { MLGovernanceService } from "../services/mlGovernanceService";
+import { MLPromotionPolicyService } from "../services/mlPromotionPolicyService";
+import { MLModelPromotionService } from "../services/mlModelPromotionService";
 import { AuthenticatedRequest } from "../middleware/authMiddleware";
 
 export const registerModel = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
@@ -240,6 +242,80 @@ export const getDataset = async (req: Request, res: Response): Promise<void> => 
     });
   } catch (err: any) {
     res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
+};
+
+// Batch D2: Promotion Engine Controller Actions
+
+export const getPromotionReadiness = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const modelId = String(req.params.modelId);
+    const result = await MLPromotionPolicyService.evaluatePromotionReadiness(modelId);
+    res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (err: any) {
+    const statusCode = err.message.includes("Not Found") ? 404 : 400;
+    res.status(statusCode).json({
+      success: false,
+      error: err.message,
+    });
+  }
+};
+
+export const promoteModel = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const modelId = String(req.params.modelId);
+    const actor = req.user?.username || "ADMIN_OPERATOR";
+    const result = await MLModelPromotionService.promoteModel(modelId, actor);
+    res.status(200).json({
+      success: true,
+      message: result.message,
+      data: result,
+    });
+  } catch (err: any) {
+    let statusCode = 400;
+    if (err.message.includes("Not Found")) {
+      statusCode = 404;
+    } else if (
+      err.message.includes("Conflict") ||
+      err.message.includes("Idempotency") ||
+      err.name === "DeploymentLockConflictError" ||
+      err.statusCode === 409
+    ) {
+      statusCode = 409;
+    }
+    res.status(statusCode).json({
+      success: false,
+      error: err.message,
+    });
+  }
+};
+
+export const getPromotionStatus = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const modelId = String(req.params.modelId);
+    const status = await MLModelPromotionService.getPromotionStatus(modelId);
+    res.status(200).json({
+      success: true,
+      data: status,
+    });
+  } catch (err: any) {
+    const statusCode = err.message.includes("Not Found") ? 404 : 400;
+    res.status(statusCode).json({
       success: false,
       error: err.message,
     });

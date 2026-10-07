@@ -42,7 +42,15 @@ export interface IDeploymentAuditEvent extends Document {
     | "MODEL_VALIDATION_FAILED"
     | "MODEL_APPROVAL_REQUESTED"
     | "MODEL_APPROVED"
-    | "MODEL_REJECTED";
+    | "MODEL_REJECTED"
+    // Phase 5.3 Batch D2: Model Promotion Lifecycle Actions
+    | "MODEL_PROMOTION_VALIDATION_STARTED"
+    | "MODEL_PROMOTION_GATE_PASSED"
+    | "MODEL_PROMOTION_GATE_FAILED"
+    | "MODEL_PROMOTION_APPROVED"
+    | "MODEL_PROMOTION_STARTED"
+    | "MODEL_PROMOTED"
+    | "MODEL_PROMOTION_FAILED";
   promQl?: string;                   // PromQL expression used
   observedValue?: number | null;     // Measured Prometheus metric
   threshold?: number;                // SLO threshold
@@ -63,6 +71,12 @@ export interface IDeploymentAuditEvent extends Document {
   evaluationId?: string;
   approvalId?: string;
   validationSummary?: string;
+
+  // Phase 5.3 Batch D2: ML Model Promotion Fields
+  predecessorModelId?: string;
+  predecessorVersion?: string;
+  predecessorArtifactSHA256?: string;
+  promotionPolicyVersion?: string;
 
   createdAt: Date;
   updatedAt: Date;
@@ -194,6 +208,14 @@ const deploymentAuditEventSchema = new Schema<IDeploymentAuditEvent>(
         "MODEL_APPROVAL_REQUESTED",
         "MODEL_APPROVED",
         "MODEL_REJECTED",
+        // Batch D2
+        "MODEL_PROMOTION_VALIDATION_STARTED",
+        "MODEL_PROMOTION_GATE_PASSED",
+        "MODEL_PROMOTION_GATE_FAILED",
+        "MODEL_PROMOTION_APPROVED",
+        "MODEL_PROMOTION_STARTED",
+        "MODEL_PROMOTED",
+        "MODEL_PROMOTION_FAILED",
       ],
       required: true,
     },
@@ -273,6 +295,23 @@ const deploymentAuditEventSchema = new Schema<IDeploymentAuditEvent>(
       trim: true,
     },
     validationSummary: {
+      type: String,
+      trim: true,
+    },
+    // Batch D2: Promotion Fields
+    predecessorModelId: {
+      type: String,
+      trim: true,
+    },
+    predecessorVersion: {
+      type: String,
+      trim: true,
+    },
+    predecessorArtifactSHA256: {
+      type: String,
+      trim: true,
+    },
+    promotionPolicyVersion: {
       type: String,
       trim: true,
     },
