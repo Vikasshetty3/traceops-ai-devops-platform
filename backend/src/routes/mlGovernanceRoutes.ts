@@ -16,6 +16,12 @@ import {
   getPromotionStatus,
   rollbackModel,
   getRollbackStatus,
+  createTelemetryAssociation,
+  getTelemetryAssociation,
+  getModelTelemetryAssociations,
+  evaluateDrift,
+  getDriftEvaluation,
+  getModelDriftEvaluations,
 } from "../controllers/mlGovernanceController";
 import { requireAuth, requireAdmin } from "../middleware/authMiddleware";
 
@@ -42,6 +48,15 @@ router.get("/models/:modelId/promotion-status", requireAuth, getPromotionStatus)
 // Batch D3: Model Rollback & Predecessor Restoration
 router.post("/models/:modelId/rollback", requireAuth, requireAdmin, rollbackModel);
 router.get("/models/:modelId/rollback-status", requireAuth, getRollbackStatus);
+
+// Batch D4: Telemetry Association & Statistical Drift Endpoints
+router.post("/telemetry-associations", requireAuth, requireAdmin, createTelemetryAssociation);
+router.get("/telemetry-associations/:associationId", requireAuth, getTelemetryAssociation);
+router.get("/models/:modelId/telemetry-associations", requireAuth, getModelTelemetryAssociations);
+
+router.post("/drift/evaluate/:associationId", requireAuth, requireAdmin, evaluateDrift);
+router.get("/drift/:evaluationId", requireAuth, getDriftEvaluation);
+router.get("/models/:modelId/drift", requireAuth, getModelDriftEvaluations);
 
 // Prohibited Endpoints: Direct / un-scoped mutations fail closed with 404
 router.post("/rollback", (_req, res) => {

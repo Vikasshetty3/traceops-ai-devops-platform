@@ -3,6 +3,8 @@ import { MLGovernanceService } from "../services/mlGovernanceService";
 import { MLPromotionPolicyService } from "../services/mlPromotionPolicyService";
 import { MLModelPromotionService } from "../services/mlModelPromotionService";
 import { MLModelRollbackService } from "../services/mlModelRollbackService";
+import { MLTelemetryAssociationService } from "../services/mlTelemetryAssociationService";
+import { MLDriftDetectionService } from "../services/mlDriftDetectionService";
 import { AuthenticatedRequest } from "../middleware/authMiddleware";
 
 export const registerModel = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
@@ -389,6 +391,151 @@ export const getRollbackStatus = async (
   } catch (err: any) {
     const statusCode = err.message.includes("Not Found") || err.message.includes("not found") ? 404 : 400;
     res.status(statusCode).json({
+      success: false,
+      error: err.message,
+    });
+  }
+};
+
+// ============================================================================
+// Batch D4: Telemetry Association & Statistical Drift Controller Actions
+// ============================================================================
+
+export const createTelemetryAssociation = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const actor = req.user?.username || "SYSTEM";
+    const result = await MLTelemetryAssociationService.createAssociation({
+      ...req.body,
+      actor,
+    });
+    res.status(201).json({
+      success: true,
+      data: result,
+    });
+  } catch (err: any) {
+    const statusCode = err.message.includes("not found") ? 404 : 400;
+    res.status(statusCode).json({
+      success: false,
+      error: err.message,
+    });
+  }
+};
+
+export const getTelemetryAssociation = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const associationId = String(req.params.associationId);
+    const result = await MLTelemetryAssociationService.getAssociationById(associationId);
+    if (!result) {
+      res.status(404).json({
+        success: false,
+        error: `Telemetry association not found: "${associationId}"`,
+      });
+      return;
+    }
+    res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (err: any) {
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
+};
+
+export const getModelTelemetryAssociations = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const modelId = String(req.params.modelId);
+    const results = await MLTelemetryAssociationService.listAssociationsForModel(modelId);
+    res.status(200).json({
+      success: true,
+      count: results.length,
+      data: results,
+    });
+  } catch (err: any) {
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
+};
+
+export const evaluateDrift = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const associationId = String(req.params.associationId);
+    const referenceDatasetId = req.body?.referenceDatasetId;
+    const actor = req.user?.username || "SYSTEM";
+    const result = await MLDriftDetectionService.evaluateDrift({
+      associationId,
+      referenceDatasetId,
+      actor,
+    });
+    res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (err: any) {
+    const statusCode = err.message.includes("not found") ? 404 : 400;
+    res.status(statusCode).json({
+      success: false,
+      error: err.message,
+    });
+  }
+};
+
+export const getDriftEvaluation = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const evaluationId = String(req.params.evaluationId);
+    const result = await MLDriftDetectionService.getEvaluationById(evaluationId);
+    if (!result) {
+      res.status(404).json({
+        success: false,
+        error: `Drift evaluation not found: "${evaluationId}"`,
+      });
+      return;
+    }
+    res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (err: any) {
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
+};
+
+export const getModelDriftEvaluations = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const modelId = String(req.params.modelId);
+    const results = await MLDriftDetectionService.listEvaluationsForModel(modelId);
+    res.status(200).json({
+      success: true,
+      count: results.length,
+      data: results,
+    });
+  } catch (err: any) {
+    res.status(500).json({
       success: false,
       error: err.message,
     });

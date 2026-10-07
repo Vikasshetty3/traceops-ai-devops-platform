@@ -115,6 +115,13 @@ export interface AppendModelAuditEventParams {
   targetModelVersion?: string;
   targetArtifactSHA256?: string;
   rollbackReason?: string;
+  // Batch D4: Telemetry Association & Drift fields
+  associationId?: string;
+  driftEvaluationId?: string;
+  policyVersion?: string;
+  driftStatus?: string;
+  repairId?: string;
+  deploymentId?: string;
   action:
     | "MODEL_REGISTERED"
     | "MODEL_EVALUATION_RECORDED"
@@ -136,7 +143,16 @@ export interface AppendModelAuditEventParams {
     | "MODEL_ROLLBACK_VALIDATION_FAILED"
     | "MODEL_ROLLBACK_STARTED"
     | "MODEL_ROLLED_BACK"
-    | "MODEL_ROLLBACK_FAILED";
+    | "MODEL_ROLLBACK_FAILED"
+    | "TELEMETRY_ASSOCIATION_CREATED"
+    | "TELEMETRY_ASSOCIATION_STARTED"
+    | "TELEMETRY_ASSOCIATION_COMPLETED"
+    | "TELEMETRY_ASSOCIATION_FAILED"
+    | "DRIFT_EVALUATION_STARTED"
+    | "DRIFT_EVALUATION_COMPLETED"
+    | "DRIFT_DETECTED"
+    | "DRIFT_EVALUATION_INSUFFICIENT_DATA"
+    | "DRIFT_EVALUATION_FAILED";
   actor: string;
   parentEventHash?: string;
 }
@@ -205,6 +221,19 @@ export class DeploymentAuditService {
         baseModelPayload.targetArtifactSHA256 = event.targetArtifactSHA256 ? String(event.targetArtifactSHA256) : null;
         baseModelPayload.targetModelId = event.targetModelId ? String(event.targetModelId) : null;
         baseModelPayload.targetModelVersion = event.targetModelVersion ? String(event.targetModelVersion) : null;
+      }
+
+      if (
+        event.action &&
+        (String(event.action).startsWith("TELEMETRY_ASSOCIATION_") ||
+          String(event.action).startsWith("DRIFT_"))
+      ) {
+        baseModelPayload.associationId = event.associationId ? String(event.associationId) : null;
+        baseModelPayload.driftEvaluationId = event.driftEvaluationId ? String(event.driftEvaluationId) : null;
+        baseModelPayload.driftStatus = event.driftStatus ? String(event.driftStatus) : null;
+        baseModelPayload.policyVersion = event.policyVersion ? String(event.policyVersion) : null;
+        baseModelPayload.repairId = event.repairId ? String(event.repairId) : null;
+        baseModelPayload.deploymentId = event.deploymentId ? String(event.deploymentId) : null;
       }
 
       return baseModelPayload;
@@ -548,9 +577,14 @@ export class DeploymentAuditService {
       targetModelVersion: params.targetModelVersion,
       targetArtifactSHA256: params.targetArtifactSHA256,
       rollbackReason: params.rollbackReason,
+      // Batch D4 telemetry association & drift fields
+      associationId: params.associationId,
+      driftEvaluationId: params.driftEvaluationId,
+      policyVersion: params.policyVersion,
+      driftStatus: params.driftStatus,
       // Deployment compatibility fields
-      deploymentId: modelId,
-      repairId: "MODEL_GOVERNANCE",
+      deploymentId: params.deploymentId || modelId,
+      repairId: params.repairId || "MODEL_GOVERNANCE",
       projectId: "TRACE-OPS-ML",
       service: "ml-service",
       candidateCommitSha: "HEAD",

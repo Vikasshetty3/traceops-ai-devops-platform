@@ -58,7 +58,17 @@ export interface IDeploymentAuditEvent extends Document {
     | "MODEL_ROLLBACK_VALIDATION_FAILED"
     | "MODEL_ROLLBACK_STARTED"
     | "MODEL_ROLLED_BACK"
-    | "MODEL_ROLLBACK_FAILED";
+    | "MODEL_ROLLBACK_FAILED"
+    // Phase 5.3 Batch D4: Telemetry Association & Drift Actions
+    | "TELEMETRY_ASSOCIATION_CREATED"
+    | "TELEMETRY_ASSOCIATION_STARTED"
+    | "TELEMETRY_ASSOCIATION_COMPLETED"
+    | "TELEMETRY_ASSOCIATION_FAILED"
+    | "DRIFT_EVALUATION_STARTED"
+    | "DRIFT_EVALUATION_COMPLETED"
+    | "DRIFT_DETECTED"
+    | "DRIFT_EVALUATION_INSUFFICIENT_DATA"
+    | "DRIFT_EVALUATION_FAILED";
   promQl?: string;                   // PromQL expression used
   observedValue?: number | null;     // Measured Prometheus metric
   threshold?: number;                // SLO threshold
@@ -91,6 +101,12 @@ export interface IDeploymentAuditEvent extends Document {
   targetModelVersion?: string;
   targetArtifactSHA256?: string;
   rollbackReason?: string;
+
+  // Phase 5.3 Batch D4: Telemetry Association & Drift Fields
+  associationId?: string;
+  driftEvaluationId?: string;
+  policyVersion?: string;
+  driftStatus?: string;
 
   createdAt: Date;
   updatedAt: Date;
@@ -238,6 +254,15 @@ const deploymentAuditEventSchema = new Schema<IDeploymentAuditEvent>(
         "MODEL_ROLLBACK_STARTED",
         "MODEL_ROLLED_BACK",
         "MODEL_ROLLBACK_FAILED",
+        "TELEMETRY_ASSOCIATION_CREATED",
+        "TELEMETRY_ASSOCIATION_STARTED",
+        "TELEMETRY_ASSOCIATION_COMPLETED",
+        "TELEMETRY_ASSOCIATION_FAILED",
+        "DRIFT_EVALUATION_STARTED",
+        "DRIFT_EVALUATION_COMPLETED",
+        "DRIFT_DETECTED",
+        "DRIFT_EVALUATION_INSUFFICIENT_DATA",
+        "DRIFT_EVALUATION_FAILED",
       ],
       required: true,
     },
@@ -351,6 +376,25 @@ const deploymentAuditEventSchema = new Schema<IDeploymentAuditEvent>(
       trim: true,
     },
     rollbackReason: {
+      type: String,
+      trim: true,
+    },
+    // Batch D4: Association & Drift Fields
+    associationId: {
+      type: String,
+      trim: true,
+      index: true,
+    },
+    driftEvaluationId: {
+      type: String,
+      trim: true,
+      index: true,
+    },
+    policyVersion: {
+      type: String,
+      trim: true,
+    },
+    driftStatus: {
       type: String,
       trim: true,
     },
