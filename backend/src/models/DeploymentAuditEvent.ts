@@ -50,7 +50,15 @@ export interface IDeploymentAuditEvent extends Document {
     | "MODEL_PROMOTION_APPROVED"
     | "MODEL_PROMOTION_STARTED"
     | "MODEL_PROMOTED"
-    | "MODEL_PROMOTION_FAILED";
+    | "MODEL_PROMOTION_FAILED"
+    // Phase 5.3 Batch D3: Model Rollback Lifecycle Actions
+    | "MODEL_ROLLBACK_REQUESTED"
+    | "MODEL_ROLLBACK_VALIDATION_STARTED"
+    | "MODEL_ROLLBACK_VALIDATION_PASSED"
+    | "MODEL_ROLLBACK_VALIDATION_FAILED"
+    | "MODEL_ROLLBACK_STARTED"
+    | "MODEL_ROLLED_BACK"
+    | "MODEL_ROLLBACK_FAILED";
   promQl?: string;                   // PromQL expression used
   observedValue?: number | null;     // Measured Prometheus metric
   threshold?: number;                // SLO threshold
@@ -77,6 +85,12 @@ export interface IDeploymentAuditEvent extends Document {
   predecessorVersion?: string;
   predecessorArtifactSHA256?: string;
   promotionPolicyVersion?: string;
+
+  // Phase 5.3 Batch D3: ML Model Rollback Fields
+  targetModelId?: string;
+  targetModelVersion?: string;
+  targetArtifactSHA256?: string;
+  rollbackReason?: string;
 
   createdAt: Date;
   updatedAt: Date;
@@ -216,6 +230,14 @@ const deploymentAuditEventSchema = new Schema<IDeploymentAuditEvent>(
         "MODEL_PROMOTION_STARTED",
         "MODEL_PROMOTED",
         "MODEL_PROMOTION_FAILED",
+        // Batch D3
+        "MODEL_ROLLBACK_REQUESTED",
+        "MODEL_ROLLBACK_VALIDATION_STARTED",
+        "MODEL_ROLLBACK_VALIDATION_PASSED",
+        "MODEL_ROLLBACK_VALIDATION_FAILED",
+        "MODEL_ROLLBACK_STARTED",
+        "MODEL_ROLLED_BACK",
+        "MODEL_ROLLBACK_FAILED",
       ],
       required: true,
     },
@@ -312,6 +334,23 @@ const deploymentAuditEventSchema = new Schema<IDeploymentAuditEvent>(
       trim: true,
     },
     promotionPolicyVersion: {
+      type: String,
+      trim: true,
+    },
+    // Batch D3: Rollback Fields
+    targetModelId: {
+      type: String,
+      trim: true,
+    },
+    targetModelVersion: {
+      type: String,
+      trim: true,
+    },
+    targetArtifactSHA256: {
+      type: String,
+      trim: true,
+    },
+    rollbackReason: {
       type: String,
       trim: true,
     },

@@ -231,7 +231,12 @@ export class SLOViolationClassifier {
   /**
    * Atomically cuts over serving state to a newly promoted model.
    */
-  public static setActiveProductionModel(modelData: any, artifactPath: string, artifactSHA: string): void {
+  public static setActiveProductionModel(
+    modelData: any,
+    artifactPath: string,
+    artifactSHA: string,
+    targetModelVersion?: string
+  ): void {
     if (!modelData || !modelData.coefficients || !modelData.scaler) {
       throw new Error("Invalid model data: coefficients and scaler are required for activation");
     }
@@ -239,7 +244,12 @@ export class SLOViolationClassifier {
     this.scaler = { ...modelData.scaler };
     this.intercept = modelData.intercept !== undefined ? modelData.intercept : this.intercept;
     this.activeThreshold = modelData.threshold !== undefined ? modelData.threshold : 0.5;
-    this.activeModelVersion = modelData.modelVersion || this.activeModelVersion;
+    this.activeModelVersion =
+      targetModelVersion ||
+      modelData.modelVersion ||
+      (artifactPath.includes("trained_model.json")
+        ? this.BASELINE_MODEL_VERSION
+        : modelData.version || this.activeModelVersion);
     this.activeArtifactSHA256 = artifactSHA;
     this.activeArtifactPath = artifactPath;
     this.activeServingStatus = "LIVE_SERVING";
@@ -444,7 +454,7 @@ export class SLOViolationClassifier {
       probability: violationProbability,
       confidence,
       model: "logistic_regression",
-      modelVersion: this.MODEL_VERSION,
+      modelVersion: this.activeModelVersion || this.MODEL_VERSION,
       schemaVersion: this.FEATURE_SCHEMA_VERSION,
       factors,
       featureContributions: contributions,

@@ -10,7 +10,12 @@ export type ModelLifecycleStatus =
   | "PRODUCTION"
   | "REJECTED"
   | "INVALID"
-  | "PROMOTION_FAILED";
+  | "PROMOTION_FAILED"
+  | "ROLLBACK_REQUESTED"
+  | "ROLLBACK_VALIDATING"
+  | "ROLLING_BACK"
+  | "ROLLED_BACK"
+  | "ROLLBACK_FAILED";
 
 export type ModelServingStatus = "OFFLINE" | "CANDIDATE_ONLY" | "LIVE_SERVING";
 
@@ -37,6 +42,10 @@ export interface IMLModelRegistry extends Document {
   approvedAt?: Date;
   promotedAt?: Date;
   predecessorModelId?: string;
+  rollbackReason?: string;
+  rolledBackAt?: Date;
+  rolledBackBy?: string;
+  rollbackTargetModelId?: string;
   rejectionReason?: string;
   validationSummary?: string;
   lastAuditEventId?: string;
@@ -90,6 +99,11 @@ const mlModelRegistrySchema = new Schema<IMLModelRegistry>(
         "REJECTED",
         "INVALID",
         "PROMOTION_FAILED",
+        "ROLLBACK_REQUESTED",
+        "ROLLBACK_VALIDATING",
+        "ROLLING_BACK",
+        "ROLLED_BACK",
+        "ROLLBACK_FAILED",
       ],
       default: "CANDIDATE",
       index: true,
@@ -168,6 +182,21 @@ const mlModelRegistrySchema = new Schema<IMLModelRegistry>(
       type: Date,
     },
     predecessorModelId: {
+      type: String,
+      trim: true,
+    },
+    rollbackReason: {
+      type: String,
+      trim: true,
+    },
+    rolledBackAt: {
+      type: Date,
+    },
+    rolledBackBy: {
+      type: String,
+      trim: true,
+    },
+    rollbackTargetModelId: {
       type: String,
       trim: true,
     },

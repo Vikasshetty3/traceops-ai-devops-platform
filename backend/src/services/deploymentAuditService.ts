@@ -66,7 +66,15 @@ export interface AppendAuditEventParams {
     | "MODEL_PROMOTION_APPROVED"
     | "MODEL_PROMOTION_STARTED"
     | "MODEL_PROMOTED"
-    | "MODEL_PROMOTION_FAILED";
+    | "MODEL_PROMOTION_FAILED"
+    // Phase 5.3 Batch D3: Model Rollback Lifecycle Actions
+    | "MODEL_ROLLBACK_REQUESTED"
+    | "MODEL_ROLLBACK_VALIDATION_STARTED"
+    | "MODEL_ROLLBACK_VALIDATION_PASSED"
+    | "MODEL_ROLLBACK_VALIDATION_FAILED"
+    | "MODEL_ROLLBACK_STARTED"
+    | "MODEL_ROLLED_BACK"
+    | "MODEL_ROLLBACK_FAILED";
   promQl?: string;
   observedValue?: number | null;
   threshold?: number;
@@ -102,6 +110,11 @@ export interface AppendModelAuditEventParams {
   predecessorVersion?: string;
   predecessorArtifactSHA256?: string;
   promotionPolicyVersion?: string;
+  // Batch D3: Rollback fields
+  targetModelId?: string;
+  targetModelVersion?: string;
+  targetArtifactSHA256?: string;
+  rollbackReason?: string;
   action:
     | "MODEL_REGISTERED"
     | "MODEL_EVALUATION_RECORDED"
@@ -116,7 +129,14 @@ export interface AppendModelAuditEventParams {
     | "MODEL_PROMOTION_APPROVED"
     | "MODEL_PROMOTION_STARTED"
     | "MODEL_PROMOTED"
-    | "MODEL_PROMOTION_FAILED";
+    | "MODEL_PROMOTION_FAILED"
+    | "MODEL_ROLLBACK_REQUESTED"
+    | "MODEL_ROLLBACK_VALIDATION_STARTED"
+    | "MODEL_ROLLBACK_VALIDATION_PASSED"
+    | "MODEL_ROLLBACK_VALIDATION_FAILED"
+    | "MODEL_ROLLBACK_STARTED"
+    | "MODEL_ROLLED_BACK"
+    | "MODEL_ROLLBACK_FAILED";
   actor: string;
   parentEventHash?: string;
 }
@@ -164,7 +184,7 @@ export class DeploymentAuditService {
 
     // Batch D1: Model Governance canonical payload
     if (event.modelId) {
-      return {
+      const baseModelPayload: Record<string, any> = {
         action: String(event.action),
         actor: String(event.actor),
         approvalId: event.approvalId ? String(event.approvalId) : null,
@@ -179,6 +199,15 @@ export class DeploymentAuditService {
         timestamp: ts,
         validationSummary: event.validationSummary ? String(event.validationSummary) : null,
       };
+
+      if (event.action && String(event.action).startsWith("MODEL_ROLLBACK_")) {
+        baseModelPayload.rollbackReason = event.rollbackReason ? String(event.rollbackReason) : null;
+        baseModelPayload.targetArtifactSHA256 = event.targetArtifactSHA256 ? String(event.targetArtifactSHA256) : null;
+        baseModelPayload.targetModelId = event.targetModelId ? String(event.targetModelId) : null;
+        baseModelPayload.targetModelVersion = event.targetModelVersion ? String(event.targetModelVersion) : null;
+      }
+
+      return baseModelPayload;
     }
 
     return {
@@ -514,6 +543,11 @@ export class DeploymentAuditService {
       predecessorVersion: params.predecessorVersion,
       predecessorArtifactSHA256: params.predecessorArtifactSHA256,
       promotionPolicyVersion: params.promotionPolicyVersion,
+      // Batch D3 rollback fields
+      targetModelId: params.targetModelId,
+      targetModelVersion: params.targetModelVersion,
+      targetArtifactSHA256: params.targetArtifactSHA256,
+      rollbackReason: params.rollbackReason,
       // Deployment compatibility fields
       deploymentId: modelId,
       repairId: "MODEL_GOVERNANCE",

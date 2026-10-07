@@ -14,6 +14,8 @@ import {
   getPromotionReadiness,
   promoteModel,
   getPromotionStatus,
+  rollbackModel,
+  getRollbackStatus,
 } from "../controllers/mlGovernanceController";
 import { requireAuth, requireAdmin } from "../middleware/authMiddleware";
 
@@ -36,6 +38,18 @@ router.post("/models/:modelId/approval", requireAuth, requireAdmin, reviewApprov
 router.get("/models/:modelId/promotion-readiness", requireAuth, getPromotionReadiness);
 router.post("/models/:modelId/promote", requireAuth, requireAdmin, promoteModel);
 router.get("/models/:modelId/promotion-status", requireAuth, getPromotionStatus);
+
+// Batch D3: Model Rollback & Predecessor Restoration
+router.post("/models/:modelId/rollback", requireAuth, requireAdmin, rollbackModel);
+router.get("/models/:modelId/rollback-status", requireAuth, getRollbackStatus);
+
+// Prohibited Endpoints: Direct / un-scoped mutations fail closed with 404
+router.post("/rollback", (_req, res) => {
+  res.status(404).json({ success: false, error: "Not Found: Direct rollback endpoint is prohibited." });
+});
+router.post("/promote", (_req, res) => {
+  res.status(404).json({ success: false, error: "Not Found: Direct promote endpoint is prohibited." });
+});
 
 // Audit Trail & Cryptographic Chain Verification
 router.get("/models/:modelId/audit", getModelAudit);

@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { MLGovernanceService } from "../services/mlGovernanceService";
 import { MLPromotionPolicyService } from "../services/mlPromotionPolicyService";
 import { MLModelPromotionService } from "../services/mlModelPromotionService";
+import { MLModelRollbackService } from "../services/mlModelRollbackService";
 import { AuthenticatedRequest } from "../middleware/authMiddleware";
 
 export const registerModel = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
@@ -315,6 +316,78 @@ export const getPromotionStatus = async (
     });
   } catch (err: any) {
     const statusCode = err.message.includes("Not Found") ? 404 : 400;
+    res.status(statusCode).json({
+      success: false,
+      error: err.message,
+    });
+  }
+};
+
+// Batch D3: Rollback Engine Controller Actions
+
+export const rollbackModel = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const modelId = String(req.params.modelId);
+    const actor = req.user?.username || "ADMIN_OPERATOR";
+    const reason = req.body?.reason;
+
+    if (!reason || typeof reason !== "string" || !reason.trim()) {
+      res.status(400).json({
+        success: false,
+        error: "Rollback Safety Violation: Explicit, non-empty rollback reason is required.",
+      });
+      return;
+    }
+
+    const result = await MLModelRollbackService.rollbackModel(modelId, actor, reason);
+    res.status(200).json({
+      success: true,
+      status: result.status,
+      targetModelId: result.targetModelId,
+      targetVersion: result.targetVersion,
+      targetArtifactSHA256: result.targetArtifactSHA256,
+      previousModelId: result.previousModelId,
+      previousVersion: result.previousVersion,
+      reason: result.reason,
+      verifiedServingIdentity: result.verifiedServingIdentity,
+      auditVerification: result.auditVerification,
+      message: result.message,
+    });
+  } catch (err: any) {
+    let statusCode = 400;
+    if (err.message.includes("Not Found") || err.message.includes("not found")) {
+      statusCode = 404;
+    } else if (
+      err.message.includes("Conflict") ||
+      err.name === "DeploymentLockConflictError" ||
+      err.statusCode === 409
+    ) {
+      statusCode = 409;
+    }
+    res.status(statusCode).json({
+      success: false,
+      status: "ROLLBACK_FAILED",
+      error: err.message,
+    });
+  }
+};
+
+export const getRollbackStatus = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const modelId = String(req.params.modelId);
+    const status = await MLModelRollbackService.getRollbackStatus(modelId);
+    res.status(200).json({
+      success: true,
+      data: status,
+    });
+  } catch (err: any) {
+    const statusCode = err.message.includes("Not Found") || err.message.includes("not found") ? 404 : 400;
     res.status(statusCode).json({
       success: false,
       error: err.message,
