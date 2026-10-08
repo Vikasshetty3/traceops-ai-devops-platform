@@ -209,8 +209,11 @@ async function runTestSuite() {
     console.log("\n--- Category 1: Post-Repair Telemetry Association Validation & Lifecycle ---");
 
     // 1. Valid repair/deployment association
-    // Use genuine repair & deployment: REP-PRED-347762 / DEP-PRED-347762 on PaymentGateway
-    const realDep = await Deployment.findOne({ service: "PaymentGateway", repairId: { $ne: null } });
+    // Use genuine repair & deployment with completed post-repair telemetry window
+    const realDep =
+      (await Deployment.findOne({ deploymentId: "DEP-TAMPER-587303" })) ||
+      (await Deployment.findOne({ service: "PaymentGateway", createdAt: { $lte: new Date("2026-10-07T16:00:00Z") }, repairId: { $ne: null } })) ||
+      (await Deployment.findOne({ service: "PaymentGateway", repairId: { $ne: null } }));
     assert(realDep !== null, "Genuine deployment found in database (DEP-PRED-347762)");
     const realRep = await CodeRepair.findOne({ repairId: realDep.repairId });
     assert(realRep !== null, "Genuine repair found in database (REP-PRED-347762)");

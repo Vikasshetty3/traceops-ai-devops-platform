@@ -98,12 +98,14 @@ function makeHttpRequest(urlStr, options = {}) {
 
 // Helper: Spawn mock HTTP container server
 function spawnMockContainerServer(port, responsePayload) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const server = http.createServer((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify(responsePayload));
     });
+    server.on("error", reject);
     server.listen(port, "127.0.0.1", () => {
+      server.assignedPort = server.address().port;
       resolve(server);
     });
   });
@@ -121,23 +123,23 @@ async function runTestSuite() {
 
   const nonce = Date.now();
   const testService = `CanaryTestService-${nonce}`;
-  const predecessorHostPort = 63100;
-  const predecessorPort = predecessorHostPort;
-  const candidatePort = 63101;
-  const proxyIngressPort = 63102;
 
-  // Spin up real mock HTTP container endpoints
-  const predecessorServer = await spawnMockContainerServer(predecessorPort, {
+  // Spin up real mock HTTP container endpoints with dynamic port assignment
+  const predecessorServer = await spawnMockContainerServer(0, {
     status: "UP",
     version: "predecessor",
     service: testService,
   });
+  const predecessorHostPort = predecessorServer.assignedPort;
+  const predecessorPort = predecessorHostPort;
 
-  const candidateServer = await spawnMockContainerServer(candidatePort, {
+  const candidateServer = await spawnMockContainerServer(0, {
     status: "UP",
     version: "candidate",
     service: testService,
   });
+  const candidatePort = candidateServer.assignedPort;
+  const proxyIngressPort = 0;
 
   const testRepairId = `REP-C3-${nonce}`;
   const testDeploymentId = `DEP-C3-${nonce}`;

@@ -4,10 +4,10 @@
   "artifactPath": "data/trained_model.json",
   "artifactSHA256": "74460AC69D6C8B507955081943620817E96C9F9631D7BA81EB30A400BD86EC49",
   "promotedAt": "2026-10-07T15:06:36.649Z",
-  "rolledBackAt": "2026-10-07T16:17:29.612Z",
-  "rolledBackBy": "admin_d3_1791389848509",
+  "rolledBackAt": "2026-10-08T15:59:44.804Z",
+  "rolledBackBy": "admin_d5_1791475181294",
   "previousModelId": "mdl-cand-3.1.0",
   "previousVersion": "3.1.0-real-runtime-training",
   "previousArtifactSHA256": "06240DB6F6FB75EAD3F269301574A7A15AA5EFE4C5F2B82C1D0651A5090CAE9A",
-  "rollbackReason": "Operational rollback to restore verified baseline predecessor 2.0.0"
+  "rollbackReason": "Operational rollback in Batch D5 to restore verified baseline predecessor 2.0.0"
 }
