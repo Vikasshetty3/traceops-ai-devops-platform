@@ -5,7 +5,7 @@ services:
     container_name: traceops-mongodb
     restart: unless-stopped
     ports:
-      - "27017:27017"
+      - "127.0.0.1:27017:27017"
     volumes:
       - mongo_data:/data/db
     networks:
@@ -23,12 +23,17 @@ services:
     container_name: traceops-ml-service
     restart: unless-stopped
     ports:
-      - "5001:5001"
+      - "127.0.0.1:5001:5001"
     environment:
       - PORT=5001
       - NODE_ENV=production
     networks:
       - traceops-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:5001/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
 
   backend:
     build:
@@ -46,13 +51,18 @@ services:
       - DEVOPS_PROVIDER=simulation
       - KUBERNETES_NAMESPACE=requirement-traceable-devops
       - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - JWT_SECRET=${JWT_SECRET:-traceops_production_secret_key_2026}
+      - JWT_SECRET=${JWT_SECRET}
       - NODE_ENV=production
     depends_on:
       mongodb:
         condition: service_healthy
       ml-service:
-        condition: service_started
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     networks:

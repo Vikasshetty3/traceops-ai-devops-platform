@@ -17,6 +17,13 @@ import { MLModelRegistry } from "../models/MLModelRegistry";
 import { MLDatasetVersion } from "../models/MLDatasetVersion";
 import { MLModelEvaluation } from "../models/MLModelEvaluation";
 import { MLModelApproval } from "../models/MLModelApproval";
+import { MLTelemetryAssociation } from "../models/MLTelemetryAssociation";
+import { MLDriftEvaluation } from "../models/MLDriftEvaluation";
+import { DeploymentLock } from "../models/DeploymentLock";
+import { DeploymentVerification } from "../models/DeploymentVerification";
+import { CodeRepair } from "../models/CodeRepair";
+import { CodeIssue } from "../models/CodeIssue";
+import { TelemetryObservation } from "../models/TelemetryObservation";
 
 export const initializeDatabaseSchema = async (): Promise<void> => {
   try {
@@ -32,6 +39,13 @@ export const initializeDatabaseSchema = async (): Promise<void> => {
       MLDatasetVersion.createIndexes().catch(() => {}),
       MLModelEvaluation.createIndexes().catch(() => {}),
       MLModelApproval.createIndexes().catch(() => {}),
+      MLTelemetryAssociation.createIndexes().catch(() => {}),
+      MLDriftEvaluation.createIndexes().catch(() => {}),
+      DeploymentLock.createIndexes().catch(() => {}),
+      DeploymentVerification.createIndexes().catch(() => {}),
+      CodeRepair.createIndexes().catch(() => {}),
+      CodeIssue.createIndexes().catch(() => {}),
+      TelemetryObservation.createIndexes().catch(() => {}),
     ]);
   } catch (error) {
     console.error("Schema initialization notice:", error);

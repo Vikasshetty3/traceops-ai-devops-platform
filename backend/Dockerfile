@@ -39,4 +39,7 @@ COPY --from=builder /app/backend/dist ./dist
 
 EXPOSE 5000
 
+HEALTHCHECK --interval=20s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost:5000/health/ready || exit 1
+
 CMD ["node", "dist/backend/src/server.js"]

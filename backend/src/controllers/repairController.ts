@@ -237,6 +237,14 @@ export const validateRepair = async (req: Request, res: Response): Promise<void>
  */
 export const approveRepair = async (req: Request, res: Response): Promise<void> => {
   try {
+    if ((req as any).user && (req as any).user.role !== "ADMIN") {
+      res.status(403).json({
+        success: false,
+        message: "Permission Denied: Administrator role required to approve repairs.",
+      });
+      return;
+    }
+
     const repairId = String(req.params.repairId);
     const { approvedBy } = req.body;
 
@@ -283,6 +291,14 @@ export const approveRepair = async (req: Request, res: Response): Promise<void> 
  */
 export const rejectRepair = async (req: Request, res: Response): Promise<void> => {
   try {
+    if ((req as any).user && (req as any).user.role !== "ADMIN") {
+      res.status(403).json({
+        success: false,
+        message: "Permission Denied: Administrator role required to reject repairs.",
+      });
+      return;
+    }
+
     const repairId = String(req.params.repairId);
     const { reason } = req.body;
 
@@ -320,6 +336,14 @@ export const rejectRepair = async (req: Request, res: Response): Promise<void> =
  */
 export const deployRepair = async (req: Request, res: Response): Promise<void> => {
   try {
+    if ((req as any).user && (req as any).user.role !== "ADMIN") {
+      res.status(403).json({
+        success: false,
+        message: "Permission Denied: Administrator role required to deploy repairs.",
+      });
+      return;
+    }
+
     const repairId = String(req.params.repairId);
     const query = mongoose.isValidObjectId(repairId)
       ? { $or: [{ repairId }, { _id: repairId }] }

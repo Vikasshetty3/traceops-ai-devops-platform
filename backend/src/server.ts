@@ -1,11 +1,18 @@
 import app from "./app";
 import { connectDatabase } from "./config/database";
-import { env } from "./config/env";
+import { env, validateProductionConfig } from "./config/env";
 import { initializeDatabaseSchema } from "./config/seed";
 import { MLGovernanceService } from "./services/mlGovernanceService";
 import { sloMonitoringDaemon } from "./services/sloMonitoringDaemon";
 
 const startServer = async (): Promise<void> => {
+  const configValidation = validateProductionConfig();
+  if (!configValidation.valid) {
+    console.error("[CRITICAL CONFIGURATION ERROR] Production startup blocked due to configuration errors:");
+    configValidation.errors.forEach((err) => console.error(`  - ${err}`));
+    process.exit(1);
+  }
+
   await connectDatabase();
   await initializeDatabaseSchema();
   await MLGovernanceService.seedBaselineModels().catch((err) =>

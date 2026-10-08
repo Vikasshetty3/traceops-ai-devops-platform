@@ -56,16 +56,26 @@ export class MLArtifactValidator {
    * Throws an error on path traversal attempts.
    */
   public static resolveSafePath(relativeOrAbsolutePath: string): string {
+    if (!relativeOrAbsolutePath || typeof relativeOrAbsolutePath !== "string") {
+      throw new Error("Path Traversal Violation: Artifact path is required.");
+    }
+
+    if (
+      relativeOrAbsolutePath.includes("\0") ||
+      relativeOrAbsolutePath.startsWith("\\\\") ||
+      relativeOrAbsolutePath.startsWith("//") ||
+      /%2e%2e|%2f|%5c/i.test(relativeOrAbsolutePath)
+    ) {
+      throw new Error(`Path Traversal Violation: Illegal characters in artifact path "${relativeOrAbsolutePath}".`);
+    }
+
     const root = path.resolve(this.getProjectRoot());
     const resolved = path.isAbsolute(relativeOrAbsolutePath)
       ? path.resolve(relativeOrAbsolutePath)
       : path.resolve(root, relativeOrAbsolutePath);
 
-    // Normalize and verify prefix containment
-    const normalizedRoot = root.toLowerCase();
-    const normalizedResolved = resolved.toLowerCase();
-
-    if (!normalizedResolved.startsWith(normalizedRoot)) {
+    const relative = path.relative(root, resolved);
+    if (relative.startsWith("..") || path.isAbsolute(relative)) {
       throw new Error(
         `Path Traversal Violation: Artifact path "${relativeOrAbsolutePath}" resolves outside repository root.`
       );

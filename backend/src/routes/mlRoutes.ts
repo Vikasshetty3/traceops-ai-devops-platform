@@ -1,8 +1,9 @@
 import express from "express";
-import { predictViolation } from "../controllers/mlController";
+import { predictViolation, getMLHealth } from "../controllers/mlController";
 
 const router = express.Router();
 
+router.get("/health", getMLHealth);
 router.post("/predict", predictViolation);
 router.post("/", predictViolation);
 

@@ -19,6 +19,7 @@ app.get("/health", (_req: Request, res: Response) => {
     service: "traceops-ml-service",
     model: "LogisticRegression-SLOClassifier",
     modelVersion: SLOViolationClassifier.MODEL_VERSION,
+    servingStatus: "LIVE_SERVING",
     schemaVersion: SLOViolationClassifier.FEATURE_SCHEMA_VERSION,
     timestamp: new Date().toISOString(),
   });

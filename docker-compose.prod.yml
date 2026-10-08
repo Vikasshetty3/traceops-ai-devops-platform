@@ -1,0 +1,152 @@
+# =================================================================
+# TraceOps Production Docker Compose Configuration (docker-compose.prod.yml)
+# Hardened for standalone production deployment:
+# - Zero public MongoDB exposure (internal network only)
+# - Internal ML microservice communication (no host port exposure)
+# - Strict restart policies (always)
+# - Explicit container health checks with fail-closed dependencies
+# =================================================================
+
+services:
+
+  mongodb:
+    image: mongo:7.0
+    container_name: traceops-prod-mongodb
+    restart: always
+    # Strictly NO public host port exposure for database in production
+    expose:
+      - "27017"
+    volumes:
+      - mongo_prod_data:/data/db
+    networks:
+      - traceops-prod-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ml-service:
+    build:
+      context: ./ml-service
+      dockerfile: Dockerfile
+    container_name: traceops-prod-ml-service
+    restart: always
+    # Internal microservice: accessible only to backend inside network
+    expose:
+      - "5001"
+    environment:
+      - PORT=5001
+      - NODE_ENV=production
+    networks:
+      - traceops-prod-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:5001/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: traceops-prod-backend
+    restart: always
+    ports:
+      - "5000:5000"
+    environment:
+      - PORT=5000
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://mongodb:27017/requirement_traceable_devops
+      - ML_SERVICE_URL=http://ml-service:5001
+      - PROMETHEUS_URL=http://prometheus:9090
+      - DEVOPS_PROVIDER=simulation
+      - KUBERNETES_NAMESPACE=requirement-traceable-devops
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:5173}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      ml-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - traceops-prod-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: traceops-prod-frontend
+    restart: always
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    networks:
+      - traceops-prod-network
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: traceops-prod-cadvisor
+    restart: always
+    privileged: true
+    command:
+      - -disable_metrics=disk,diskIO
+    volumes:
+      - /:/rootfs:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /sys:/sys:ro
+    expose:
+      - "8080"
+    networks:
+      - traceops-prod-network
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: traceops-prod-node-exporter
+    restart: always
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    expose:
+      - "9100"
+    networks:
+      - traceops-prod-network
+
+  prometheus:
+    image: prom/prometheus:v2.50.1
+    container_name: traceops-prod-prometheus
+    restart: always
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/rules:/etc/prometheus/rules:ro
+    depends_on:
+      - backend
+      - cadvisor
+      - node-exporter
+    networks:
+      - traceops-prod-network
+
+volumes:
+  mongo_prod_data:
+    driver: local
+
+networks:
+  traceops-prod-network:
+    driver: bridge

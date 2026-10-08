@@ -107,9 +107,7 @@ export class GeminiRcaService {
     }
 
     // 4. Try Gemini reasoning over the structured real evidence
-    const apiKey =
-      process.env.GEMINI_API_KEY ||
-      "your_gemini_api_key_here";
+    const apiKey = (process.env.GEMINI_API_KEY || "").trim();
 
     let llmHypothesis: string | null = null;
     let llmCausalChain: string[] = [];

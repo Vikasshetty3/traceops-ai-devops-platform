@@ -2,6 +2,21 @@ import { Request, Response } from "express";
 import { MLClient } from "../services/mlClient";
 import { MLFeatureExtractor } from "../services/mlFeatureExtractor";
 
+export const getMLHealth = async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const health = await MLClient.getHealth();
+    res.status(200).json({
+      success: true,
+      data: health.data || health,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
+
 /**
  * Handles ML SLO violation forecasting.
  *
