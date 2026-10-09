@@ -37,6 +37,10 @@ RUN npm ci --omit=dev
 # Copy compiled JavaScript output
 COPY --from=builder /app/backend/dist ./dist
 
+# Copy verified model data artifacts
+COPY data /app/data
+COPY ml-service/data /app/ml-service/data
+
 EXPOSE 5000
 
 HEALTHCHECK --interval=20s --timeout=5s --start-period=10s --retries=3 \

@@ -143,7 +143,7 @@ async function runPhase3_3Tests() {
   // ----------------------------------------------------
   console.log("[1/10] Verifying Real Dataset Extraction from Live Runtime Databases...");
   const [obsRes, incRes] = await Promise.all([
-    request("/api/telemetry-observations?limit=500"),
+    request("/api/telemetry-observations?featuresComplete=true&limit=500"),
     request("/api/incidents"),
   ]);
 

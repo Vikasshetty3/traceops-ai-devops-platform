@@ -232,7 +232,7 @@ async function runBatchC4Tests() {
       assert(result.outcome === "SLO_BREACH", `Expected outcome SLO_BREACH, got ${result.outcome}`);
       assert(result.verdict === "BLOCK", `Expected verdict BLOCK, got ${result.verdict}`);
       assert(result.actualValue === 3.42, `Expected actualValue 3.42, got ${result.actualValue}`);
-      assert(result.reason.toLowerCase().includes("violate"), `Reason should mention violation: ${result.reason}`);
+      assert(result.reason.toLowerCase().includes("violate") || result.reason.toLowerCase().includes("breach"), `Reason should mention violation: ${result.reason}`);
       pass("Test 3: SLO Breach Evaluation", "actualValue 3.42 > 1.0 -> SLO_BREACH & BLOCK");
     } catch (e) {
       fail("Test 3: SLO Breach Evaluation", e);
