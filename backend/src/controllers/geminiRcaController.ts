@@ -1,8 +1,5 @@
 import { Request, Response } from "express";
-import {
-  analyzeWithGemini,
-  GeminiRCAInput,
-} from "../ai/geminiRcaService";
+import { GeminiRcaService } from "../ai/geminiRcaService";
 import { RCA } from "../models/RCA";
 import { Incident } from "../models/Incident";
 
@@ -11,62 +8,73 @@ export const analyzeGeminiRCA = async (
   res: Response
 ): Promise<void> => {
   try {
-    const input: GeminiRCAInput = req.body;
+    const input = req.body || {};
+    const incidentId = input.incidentId;
 
+    // Validate request has either incidentId or sufficient requirement/metric context
     if (
-      !input.requirementId ||
-      !input.service ||
-      !input.slo ||
-      !input.metric ||
-      input.actualValue === undefined ||
-      input.threshold === undefined
+      !incidentId &&
+      (!input.requirementId ||
+        !input.service ||
+        input.actualValue === undefined ||
+        input.threshold === undefined)
     ) {
       res.status(400).json({
         success: false,
         message:
-          "requirementId, service, slo, metric, actualValue and threshold are required",
+          "Either valid incidentId, or requirementId, service, actualValue, and threshold are required",
       });
       return;
     }
 
-    // Send incident evidence to Gemini or intelligent SRE fallback
-    const result = await analyzeWithGemini(input);
+    // Run genuine evidence gathering and AI RCA analysis
+    const result = await GeminiRcaService.analyze(incidentId, input);
 
-    const rcaId = `RCA-GEMINI-${Date.now().toString().slice(-6)}`;
-    const incidentId = input.incidentId || input.requirementId;
+    const rcaId = `RCA-AI-${Date.now().toString().slice(-6)}`;
 
-    // Save the RCA to MongoDB
+    // Persist full evidence-backed RCA to MongoDB
     const rca = await RCA.create({
       rcaId,
-      incidentId,
-      requirementId: input.requirementId,
-      sloId: input.slo,
-      service: input.service,
+      incidentId: result.incidentId,
+      requirementId: result.requirementId,
+      sloId: result.sloId,
+      service: result.service,
+      detectedAt: result.detectedAt ? new Date(result.detectedAt) : undefined,
+      impact: result.impact,
       rootCause: result.rootCause,
-      evidence: result.evidence,
-      confidence: result.confidence,
+      rootCauseHypothesis: result.rootCauseHypothesis,
+      observedFacts: result.observedFacts,
+      causalChain: result.causalChain,
+      contributingFactors: result.contributingFactors,
+      remediation: result.remediation,
       recommendedAction: result.recommendedAction,
-      metricsSnapshot: {
-        cpuUsage: input.cpuUsage,
-        memoryUsage: input.memoryUsage,
-        errorRate: input.errorRate,
-        latency: input.actualValue,
-        deploymentChanged: input.deploymentChanged,
-      },
+      uncertainty: result.uncertainty,
+      timeline: result.timeline,
+      confidence: result.confidence,
+      confidenceDetails: result.confidenceDetails,
+      evidence: result.evidence,
+      structuredEvidence: result.structuredEvidence,
+      analysisStatus: result.status,
+      provenance: result.provenance,
+      metricsSnapshot: result.metricsSnapshot,
       status: "GENERATED",
     });
 
-    // If an incident exists, update its status
-    if (input.incidentId) {
+    // If genuine incident exists in MongoDB, transition status to INVESTIGATING
+    if (result.incidentId && !result.incidentId.startsWith("INC-UNKNOWN")) {
       await Incident.findOneAndUpdate(
-        { incidentId: input.incidentId },
+        { incidentId: result.incidentId },
         { $set: { status: "INVESTIGATING" } }
       );
     }
 
     res.status(201).json({
       success: true,
-      message: "Gemini RCA generated and saved successfully",
+      message: result.status === "EVIDENCE_BACKED"
+        ? "Genuine evidence-backed AI RCA generated and persisted"
+        : result.status === "DETERMINISTIC_EVIDENCE_SUMMARY"
+        ? "Deterministic evidence summary generated (Gemini AI unavailable)"
+        : "RCA analysis completed: INSUFFICIENT_EVIDENCE observed",
       data: rca,
     });
   } catch (error) {

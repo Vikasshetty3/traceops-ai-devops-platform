@@ -1,7 +1,7 @@
 {
   "modelType": "logistic_regression",
   "version": "1.0.0-research",
-  "createdAt": "2026-09-03T05:02:23.162Z",
+  "createdAt": "2026-09-27T15:34:39.123Z",
   "randomSeed": 42,
   "featureNames": [
     "cpuUsage",
@@ -9,81 +9,75 @@
     "p95Latency",
     "errorRate",
     "requestRate",
-    "dbPoolUsage",
     "deploymentChanged"
   ],
   "scaler": {
     "cpuUsage": {
-      "mean": 57.2225,
-      "stdDev": 23.6169
+      "mean": 57.251,
+      "stdDev": 23.6062
     },
     "memoryUsage": {
-      "mean": 61.0535,
-      "stdDev": 19.3325
+      "mean": 61.0501,
+      "stdDev": 19.3402
     },
     "p95Latency": {
-      "mean": 1.395,
-      "stdDev": 1.3866
+      "mean": 1.396,
+      "stdDev": 1.3867
     },
     "errorRate": {
-      "mean": 1.7331,
-      "stdDev": 3.1939
+      "mean": 1.7345,
+      "stdDev": 3.1949
     },
     "requestRate": {
-      "mean": 575.5108,
-      "stdDev": 470.6762
-    },
-    "dbPoolUsage": {
-      "mean": 52.8612,
-      "stdDev": 27.5846
+      "mean": 575.8207,
+      "stdDev": 470.7501
     },
     "deploymentChanged": {
-      "mean": 0.2425,
-      "stdDev": 0.4286
+      "mean": 0.2427,
+      "stdDev": 0.4287
     }
   },
   "coefficients": {
-    "cpuUsage": 0.9177,
-    "memoryUsage": 0.5511,
-    "p95Latency": 1.7536,
-    "errorRate": 1.0169,
-    "requestRate": 0.2587,
-    "dbPoolUsage": 0.7531,
-    "deploymentChanged": 0.3739
+    "cpuUsage": 1.0218,
+    "memoryUsage": 0.7703,
+    "p95Latency": 2.0426,
+    "errorRate": 1.0764,
+    "requestRate": 0.2723,
+    "deploymentChanged": 0.3708
   },
-  "intercept": -2.3557,
+  "intercept": -2.1771,
   "threshold": 0.5,
   "metrics": {
     "train": {
-      "sampleCount": 1200,
-      "accuracy": 0.9883,
-      "precision": 0.9668,
+      "sampleCount": 1199,
+      "accuracy": 0.9858,
+      "precision": 0.9597,
       "recall": 1,
-      "f1Score": 0.9831,
+      "f1Score": 0.9794,
       "rocAuc": 0.9996,
       "confusionMatrix": {
-        "truePositive": 408,
-        "falsePositive": 14,
-        "trueNegative": 778,
+        "truePositive": 405,
+        "falsePositive": 17,
+        "trueNegative": 777,
         "falseNegative": 0
       }
     },
     "test": {
-      "sampleCount": 300,
-      "accuracy": 0.9933,
-      "precision": 0.9808,
+      "sampleCount": 301,
+      "accuracy": 0.9967,
+      "precision": 0.9903,
       "recall": 1,
-      "f1Score": 0.9903,
-      "rocAuc": 0.9999,
+      "f1Score": 0.9951,
+      "rocAuc": 1,
       "confusionMatrix": {
         "truePositive": 102,
-        "falsePositive": 2,
-        "trueNegative": 196,
+        "falsePositive": 1,
+        "trueNegative": 198,
         "falseNegative": 0
       }
     },
     "baselineTest": {
-      "sampleCount": 300,
+      "sampleCount": 301,
       "accuracy": 1,
       "precision": 1,
       "recall": 1,
@@ -92,7 +86,7 @@
       "confusionMatrix": {
         "truePositive": 102,
         "falsePositive": 0,
-        "trueNegative": 198,
+        "trueNegative": 199,
         "falseNegative": 0
       }
     }

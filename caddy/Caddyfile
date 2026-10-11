@@ -1,0 +1,71 @@
+# =================================================================
+# TraceOps Production Reverse Proxy Configuration (Caddyfile)
+# Enforces:
+# - Automatic TLS / HTTPS termination
+# - HTTP to HTTPS automatic redirection
+# - Strict isolation: only ports 80/443 exposed publicly
+# - Security headers and request size limits
+# - Reverse proxy routing to Frontend SPA and Backend API
+# - Fail-closed blocking of internal /metrics scraping endpoint
+# =================================================================
+
+{
+    # Disable local administrative API for reduced attack surface
+    admin off
+}
+
+{$DOMAIN_NAME:localhost} {
+    log {
+        output stdout
+        format json
+        level INFO
+    }
+
+    # Maximum request body size (10MB)
+    request_body {
+        max_size 10MB
+    }
+
+    # Defense-in-depth security response headers
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+    }
+
+    # Route backend REST API traffic
+    handle /api/* {
+        reverse_proxy backend:5000 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    # Route public health checks
+    handle /health* {
+        reverse_proxy backend:5000 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    # Block direct public access to Prometheus telemetry scraping endpoint
+    handle /metrics* {
+        respond "Access Denied" 403
+    }
+
+    # Route all other traffic to React Frontend container
+    handle {
+        reverse_proxy frontend:80 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+}

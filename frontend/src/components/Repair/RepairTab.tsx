@@ -494,6 +494,101 @@ export const RepairTab: React.FC<RepairTabProps> = ({ initialProjectId }) => {
                     </div>
                   </div>
 
+                  {/* Phase 5.2 — RCA Traceability & Provenance Banner */}
+                  {(currentRepair.incidentId || currentRepair.repairSource === "RUNTIME_INCIDENT") && (
+                    <div
+                      style={{
+                        marginBottom: "16px",
+                        padding: "14px 16px",
+                        borderRadius: "8px",
+                        background:
+                          currentRepair.status === "ADVISORY_ONLY" || currentRepair.status === "UNSUPPORTED_REPAIR_ACTION"
+                            ? "rgba(245, 158, 11, 0.1)"
+                            : "rgba(14, 165, 233, 0.1)",
+                        border:
+                          currentRepair.status === "ADVISORY_ONLY" || currentRepair.status === "UNSUPPORTED_REPAIR_ACTION"
+                            ? "1px solid rgba(245, 158, 11, 0.3)"
+                            : "1px solid rgba(14, 165, 233, 0.3)",
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <span
+                            style={{
+                              fontSize: "11px",
+                              fontWeight: "700",
+                              padding: "2px 8px",
+                              borderRadius: "4px",
+                              background:
+                                currentRepair.rcaAnalysisStatus === "EVIDENCE_BACKED"
+                                  ? "rgba(34, 197, 94, 0.2)"
+                                  : "rgba(245, 158, 11, 0.2)",
+                              color:
+                                currentRepair.rcaAnalysisStatus === "EVIDENCE_BACKED" ? "#4ade80" : "#fbbf24",
+                              border:
+                                currentRepair.rcaAnalysisStatus === "EVIDENCE_BACKED"
+                                  ? "1px solid #22c55e"
+                                  : "1px solid #f59e0b",
+                            }}
+                          >
+                            {currentRepair.rcaAnalysisStatus === "EVIDENCE_BACKED"
+                              ? "EVIDENCE-BACKED RCA"
+                              : currentRepair.rcaAnalysisStatus || "RCA PROVENANCE"}
+                          </span>
+                          <span style={{ fontSize: "12px", color: "#38bdf8", fontWeight: "600" }}>
+                            Model: {currentRepair.rcaModel || "gemini-2.5-flash"}
+                          </span>
+                          <span style={{ fontSize: "11px", color: "#94a3b8" }}>
+                            Source: {currentRepair.repairSource || "RUNTIME_INCIDENT"} ({currentRepair.repairTrigger || "PROMETHEUS_SLO_INCIDENT"})
+                          </span>
+                        </div>
+                        <span
+                          style={{
+                            fontSize: "11px",
+                            fontFamily: "monospace",
+                            background: "#0f172a",
+                            padding: "2px 8px",
+                            borderRadius: "4px",
+                            color: "#a5b4fc",
+                            border: "1px solid #334155",
+                          }}
+                          title={`SHA-256 Provenance Hash: ${currentRepair.evidenceSnapshotHash || ""}`}
+                        >
+                          Snapshot: {currentRepair.evidenceSnapshotHash ? `${currentRepair.evidenceSnapshotHash.slice(0, 12)}...` : "N/A"}
+                        </span>
+                      </div>
+
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px", fontSize: "12px" }}>
+                        <div>
+                          <span style={{ color: "#64748b" }}>Requirement: </span>
+                          <span style={{ color: "#f8fafc", fontFamily: "monospace" }}>{currentRepair.requirementId || "N/A"}</span>
+                        </div>
+                        <div>
+                          <span style={{ color: "#64748b" }}>SLO ID: </span>
+                          <span style={{ color: "#f8fafc", fontFamily: "monospace" }}>{currentRepair.sloId || "N/A"}</span>
+                        </div>
+                        <div>
+                          <span style={{ color: "#64748b" }}>Incident ID: </span>
+                          <span style={{ color: "#38bdf8", fontFamily: "monospace" }}>{currentRepair.incidentId || "N/A"}</span>
+                        </div>
+                        <div>
+                          <span style={{ color: "#64748b" }}>RCA ID: </span>
+                          <span style={{ color: "#a78bfa", fontFamily: "monospace" }}>{currentRepair.rcaId || "N/A"}</span>
+                        </div>
+                      </div>
+
+                      {currentRepair.candidateActionType && (
+                        <div style={{ marginTop: "8px", paddingTop: "8px", borderTop: "1px solid rgba(255,255,255,0.08)", fontSize: "12px" }}>
+                          <span style={{ color: "#94a3b8" }}>Bounded Action: </span>
+                          <span style={{ color: "#4ade80", fontWeight: "600" }}>{currentRepair.candidateActionType}</span>
+                          {currentRepair.candidateAction && (
+                            <span style={{ color: "#cbd5e1", marginLeft: "6px" }}>— "{currentRepair.candidateAction}"</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Unified Diff View */}
                   <div style={{ marginBottom: "20px" }}>
                     <div style={{ background: "#0f172a", borderRadius: "8px", overflow: "hidden", border: "1px solid #334155" }}>

@@ -8,21 +8,32 @@ import type {
   DevOpsAction,
   TraceGraphNode,
   ServiceTelemetry,
+  TelemetryOverview,
   MLPredictionData,
   CodeIssue,
   CodeRepair,
   Deployment,
   DeploymentVerification,
   RepairHistory,
+  User,
+  DeploymentAuditEvent,
+  CanaryStageStatus,
+  AdminOverview,
 } from "../types";
 
-const API_BASE = "http://localhost:5000/api";
+const API_BASE = (import.meta.env.VITE_API_BASE_URL && String(import.meta.env.VITE_API_BASE_URL).trim())
+  ? String(import.meta.env.VITE_API_BASE_URL).trim().replace(/\/+$/, "")
+  : (import.meta.env.DEV ? "http://localhost:5000/api" : "/api");
 
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
+  const token = localStorage.getItem("traceops_token");
+  const authHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+
   const res = await fetch(url, {
     ...options,
     headers: {
       "Content-Type": "application/json",
+      ...authHeaders,
       ...(options?.headers || {}),
     },
   });
@@ -306,16 +317,91 @@ export const api = {
   getProjectSLOs: (projectId: string) =>
     fetchJson<SLO[]>(`${API_BASE}/projects/${projectId}/slos`),
 
-  // Telemetry & Metrics
+  // Real Runtime Telemetry & Prometheus Queries
+  getTelemetryOverview: () => fetchJson<TelemetryOverview>(`${API_BASE}/telemetry/overview`),
+  executeLoadTest: (requests = 25, delayMs = 15, simulateError = false) =>
+    fetchJson<{ success: boolean; mode: string; message: string; samplesExecuted: number }>(
+      `${API_BASE}/telemetry/load-test`,
+      {
+        method: "POST",
+        body: JSON.stringify({ requests, delayMs, simulateError }),
+      }
+    ),
   getTelemetry: () => fetchJson<ServiceTelemetry[]>(`${API_BASE}/metrics`),
-  triggerSpike: (service = "Checkout") =>
-    fetchJson<ServiceTelemetry>(`${API_BASE}/metrics/spike`, {
+  triggerSpike: (service = "traceops-backend") =>
+    fetchJson<{ success: boolean; mode: string; message: string }>(`${API_BASE}/metrics/spike`, {
       method: "POST",
       body: JSON.stringify({ service }),
     }),
-  normalizeMetrics: (service = "Checkout") =>
-    fetchJson<ServiceTelemetry>(`${API_BASE}/metrics/normalize`, {
+  normalizeMetrics: (service = "traceops-backend") =>
+    fetchJson<{ success: boolean; mode: string; message: string }>(`${API_BASE}/metrics/normalize`, {
       method: "POST",
       body: JSON.stringify({ service }),
     }),
+
+  // Authentication & User Management
+  login: (credentials: { identifier?: string; username?: string; email?: string; password: string }) =>
+    fetchJson<{ success: boolean; user: User; token: string; message: string }>(`${API_BASE}/auth/login`, {
+      method: "POST",
+      body: JSON.stringify(credentials),
+    }),
+  signup: (data: { username: string; email: string; password: string; name: string }) =>
+    fetchJson<{ success: boolean; user: User; token: string; message: string }>(`${API_BASE}/auth/signup`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  getAuthStatus: () =>
+    fetchJson<{ success: boolean; adminInitialized: boolean; totalUsers: number }>(`${API_BASE}/auth/status`),
+  initAdmin: (data: { username: string; email: string; password: string; name?: string; initSecret?: string }) =>
+    fetchJson<{ success: boolean; user: User; token: string; message: string }>(`${API_BASE}/auth/init-admin`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  getCurrentUser: () => fetchJson<{ success: boolean; user: User }>(`${API_BASE}/auth/me`),
+  logout: () => fetchJson<{ success: boolean; message: string }>(`${API_BASE}/auth/logout`, { method: "POST" }),
+  getAllUsers: () => fetchJson<User[]>(`${API_BASE}/auth/users`),
+  getAdminOverview: () => fetchJson<AdminOverview>(`${API_BASE}/auth/admin/overview`),
+
+  // Deployments & Canary Progression
+  getDeployments: () => fetchJson<Deployment[]>(`${API_BASE}/deployments`),
+  startCanary: (deploymentId: string, params: Record<string, unknown> = {}) =>
+    fetchJson<CanaryStageStatus>(`${API_BASE}/deployments/${deploymentId}/canary/start`, {
+      method: "POST",
+      body: JSON.stringify(params),
+    }),
+  advanceCanary: (deploymentId: string, params: Record<string, unknown> = {}) =>
+    fetchJson<CanaryStageStatus>(`${API_BASE}/deployments/${deploymentId}/canary/advance`, {
+      method: "POST",
+      body: JSON.stringify(params),
+    }),
+  getCanaryStatus: (deploymentId: string) =>
+    fetchJson<CanaryStageStatus>(`${API_BASE}/deployments/${deploymentId}/canary/status`),
+  abortCanary: (deploymentId: string, reason?: string, actor?: string) =>
+    fetchJson<CanaryStageStatus>(`${API_BASE}/deployments/${deploymentId}/canary/abort`, {
+      method: "POST",
+      body: JSON.stringify({ reason, actor }),
+    }),
+  evaluateCanary: (deploymentId: string, options: Record<string, unknown> = {}) =>
+    fetchJson<{
+      passed: boolean;
+      verdict: "ALLOW" | "BLOCK";
+      outcome: string;
+      actualValue: number;
+      target: number;
+      operator: string;
+      reason: string;
+    }>(`${API_BASE}/deployments/${deploymentId}/canary/evaluate`, {
+      method: "POST",
+      body: JSON.stringify(options),
+    }),
+
+  // Cryptographic Deployment Audit Trail
+  getAuditEvents: (deploymentId?: string) => {
+    const url = deploymentId ? `${API_BASE}/audit/events?deploymentId=${deploymentId}` : `${API_BASE}/audit/events`;
+    return fetchJson<DeploymentAuditEvent[]>(url);
+  },
+  verifyAuditChain: (deploymentId: string) =>
+    fetchJson<{ valid: boolean; totalEvents: number; firstInvalidEventId: string | null; reason?: string }>(
+      `${API_BASE}/audit/verify/${deploymentId}`
+    ),
 };

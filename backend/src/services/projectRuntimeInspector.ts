@@ -152,7 +152,7 @@ export class ProjectRuntimeInspector {
       if (fs.existsSync(fullPath)) {
         const content = fs.readFileSync(fullPath, "utf-8");
         const healthRouteMatch = content.match(
-          /\.(?:get|use)\(\s*["'](\/(?:health|healthz|live|ready|status|ping))["']/i
+          /(?:\.(?:get|use)\(\s*|req\.url\s*===?\s*|req\.url\.startsWith\(\s*)["'](\/(?:health|healthz|live|ready|status|ping))["']/i
         );
         if (healthRouteMatch) {
           healthEndpoint = healthRouteMatch[1];

@@ -1,0 +1,172 @@
+{
+  "modelVersion": "3.0.0-real-runtime-training",
+  "status": "CANDIDATE",
+  "baselineVersion": "2.0.0-production-telemetry",
+  "algorithm": "logistic_regression",
+  "schemaVersion": "v2-production-telemetry",
+  "featureNames": [
+    "cpuUsage",
+    "memoryUsage",
+    "p95Latency",
+    "errorRate",
+    "requestRate",
+    "deploymentChanged"
+  ],
+  "scaler": {
+    "cpuUsage": {
+      "mean": 7.2474,
+      "stdDev": 2.209
+    },
+    "memoryUsage": {
+      "mean": 15.946,
+      "stdDev": 1.3527
+    },
+    "p95Latency": {
+      "mean": 1.575,
+      "stdDev": 1.7291
+    },
+    "errorRate": {
+      "mean": 34.759,
+      "stdDev": 31.4187
+    },
+    "requestRate": {
+      "mean": 0.4881,
+      "stdDev": 0.9439
+    },
+    "deploymentChanged": {
+      "mean": 0,
+      "stdDev": 1
+    }
+  },
+  "coefficients": {
+    "cpuUsage": 1.5834,
+    "memoryUsage": 1.3767,
+    "p95Latency": 1.5321,
+    "errorRate": 1.3822,
+    "requestRate": 0.3328,
+    "deploymentChanged": 0
+  },
+  "intercept": 4.4173,
+  "threshold": 0.5,
+  "trainingConfig": {
+    "epochs": 500,
+    "batchSize": 32,
+    "learningRate": 0.05,
+    "learningRateDecay": 0.001,
+    "l2Regularization": 0.01,
+    "iterationsCompleted": 500,
+    "convergenceStatus": "COMPLETED_MAX_EPOCHS",
+    "initialLoss": 0.69315,
+    "finalLoss": 0.09417,
+    "deterministic": true
+  },
+  "datasetSummary": {
+    "totalSamples": 815,
+    "trainCount": 570,
+    "validationCount": 122,
+    "testCount": 123,
+    "nonViolationCount": 270,
+    "violationCount": 545,
+    "temporalSpanHours": 85.75,
+    "distinctDaysCount": 3,
+    "distinctServicesCount": 17,
+    "distinctSlosCount": 133,
+    "distinctRequirementsCount": 111,
+    "dateRange": {
+      "start": "2026-09-27T11:01:59.150Z",
+      "end": "2026-10-01T00:46:53.703Z"
+    }
+  },
+  "datasetProvenance": {
+    "sourceTypes": [
+      "TELEMETRY_OBSERVATION",
+      "PROMETHEUS_SLO_MONITOR"
+    ],
+    "earliestTimestamp": "2026-09-27T11:01:59.150Z",
+    "latestTimestamp": "2026-10-01T00:46:53.703Z",
+    "leakageOverlap": 0,
+    "chronologicalOrderValid": true,
+    "datasetFingerprint": "c9e44ee61f7b201c"
+  },
+  "metrics": {
+    "train": {
+      "sampleCount": 570,
+      "accuracy": 0.9982,
+      "precision": 1,
+      "recall": 0.9979,
+      "f1Score": 0.9989,
+      "rocAuc": 1,
+      "logLoss": 0.0503,
+      "confusionMatrix": {
+        "truePositive": 485,
+        "falsePositive": 0,
+        "trueNegative": 84,
+        "falseNegative": 1
+      }
+    },
+    "validation": {
+      "sampleCount": 122,
+      "accuracy": 0.2377,
+      "precision": 0.0984,
+      "recall": 0.1364,
+      "f1Score": 0.1143,
+      "rocAuc": 0.2949,
+      "logLoss": 2.4373,
+      "confusionMatrix": {
+        "truePositive": 6,
+        "falsePositive": 55,
+        "trueNegative": 23,
+        "falseNegative": 38
+      }
+    },
+    "test": {
+      "sampleCount": 123,
+      "accuracy": 0.0894,
+      "precision": 0.0924,
+      "recall": 0.7333,
+      "f1Score": 0.1641,
+      "rocAuc": 0.7333,
+      "logLoss": 0.7824,
+      "confusionMatrix": {
+        "truePositive": 11,
+        "falsePositive": 108,
+        "trueNegative": 0,
+        "falseNegative": 4
+      }
+    },
+    "baselineComparison": {
+      "candidate": {
+        "sampleCount": 123,
+        "accuracy": 0.0894,
+        "precision": 0.0924,
+        "recall": 0.7333,
+        "f1Score": 0.1641,
+        "rocAuc": 0.7333,
+        "logLoss": 0.7824,
+        "confusionMatrix": {
+          "truePositive": 11,
+          "falsePositive": 108,
+          "trueNegative": 0,
+          "falseNegative": 4
+        }
+      },
+      "production": {
+        "sampleCount": 123,
+        "accuracy": 0.8862,
+        "precision": 1,
+        "recall": 0.0667,
+        "f1Score": 0.1251,
+        "rocAuc": 1,
+        "logLoss": 0.7563,
+        "confusionMatrix": {
+          "truePositive": 1,
+          "falsePositive": 0,
+          "trueNegative": 108,
+          "falseNegative": 14
+        }
+      }
+    }
+  },
+  "createdAt": "2026-10-01T00:47:08.832Z",
+  "checksumSha256": "fb024ca8bf8c12699d1ceb5ffa6e2a4055d5b102027dda9b395aed04faece3f9"
+}

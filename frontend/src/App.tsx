@@ -9,18 +9,26 @@ import type {
   DevOpsAction,
   TraceGraphNode,
   ServiceTelemetry,
+  TelemetryOverview,
+  Deployment,
+  User,
 } from "./types";
 import { api } from "./services/api";
-import { ProjectsTab } from "./components/Projects/ProjectsTab";
-import { RepairTab } from "./components/Repair/RepairTab";
 import { OverviewTab } from "./components/Dashboard/OverviewTab";
+import { ServicesTab } from "./components/Services/ServicesTab";
+import { ProjectsTab } from "./components/Projects/ProjectsTab";
 import { RequirementsTab } from "./components/Requirements/RequirementsTab";
 import { SLOsTab } from "./components/SLOs/SLOsTab";
 import { IncidentsTab } from "./components/Incidents/IncidentsTab";
 import { RCATab } from "./components/RCA/RCATab";
+import { RepairTab } from "./components/Repair/RepairTab";
+import { CanaryTab } from "./components/Canary/CanaryTab";
+import { AuditTrailTab } from "./components/Audit/AuditTrailTab";
 import { RemediationTab } from "./components/Remediation/RemediationTab";
 import { TraceabilityTab } from "./components/Traceability/TraceabilityTab";
 import { ResearchTab } from "./components/Research/ResearchTab";
+import { AdminTab } from "./components/Admin/AdminTab";
+import { AuthModal } from "./components/Auth/AuthModal";
 import { LoadingState, ErrorState } from "./components/common/FeedbackStates";
 import {
   FolderGit2,
@@ -35,6 +43,10 @@ import {
   RefreshCw,
   Server,
   Wrench,
+  Lock,
+  Shield,
+  LogIn,
+  LogOut,
 } from "lucide-react";
 import "./App.css";
 
@@ -42,6 +54,17 @@ export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>("overview");
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Authentication State
+  const [user, setUser] = useState<User | null>(() => {
+    try {
+      const stored = localStorage.getItem("traceops_user");
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
 
   // Core Data States
   const [projects, setProjects] = useState<Project[]>([]);
@@ -52,15 +75,18 @@ export const App: React.FC = () => {
   const [experiments, setExperiments] = useState<Experiment[]>([]);
   const [devopsActions, setDevopsActions] = useState<DevOpsAction[]>([]);
   const [telemetry, setTelemetry] = useState<ServiceTelemetry[]>([]);
+  const [telemetryOverview, setTelemetryOverview] = useState<TelemetryOverview | null>(null);
+  const [telemetryLoading, setTelemetryLoading] = useState<boolean>(true);
   const [traceGraph, setTraceGraph] = useState<TraceGraphNode[]>([]);
-  const [selectedReqId, setSelectedReqId] = useState<string>("REQ-001");
+  const [deployments, setDeployments] = useState<Deployment[]>([]);
+  const [selectedReqId, setSelectedReqId] = useState<string>("");
   const [repairProjectId, setRepairProjectId] = useState<string>("");
 
   // Fetch all primary datasets
   const loadAllData = useCallback(async () => {
     try {
       setError(null);
-      const [projs, reqs, slosData, incs, rcaData, exps, actions, telem, graph] =
+      const [projs, reqs, slosData, incs, rcaData, exps, actions, telem, toverview, graph, deps] =
         await Promise.all([
           api.getProjects(),
           api.getRequirements(),
@@ -70,7 +96,9 @@ export const App: React.FC = () => {
           api.getExperiments(),
           api.getDevOpsActions(),
           api.getTelemetry(),
+          api.getTelemetryOverview().catch(() => null),
           api.getTraceGraph(),
+          api.getDeployments().catch(() => []),
         ]);
 
       setProjects(projs || []);
@@ -81,11 +109,19 @@ export const App: React.FC = () => {
       setExperiments(exps || []);
       setDevopsActions(actions || []);
       setTelemetry(telem || []);
+      if (toverview) {
+        setTelemetryOverview(toverview);
+      }
       setTraceGraph(graph || []);
+      setDeployments(deps || []);
+      if (reqs && reqs.length > 0) {
+        setSelectedReqId((prev) => prev || reqs[0].requirementId);
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to sync state with backend API.");
     } finally {
       setLoading(false);
+      setTelemetryLoading(false);
     }
   }, []);
 
@@ -98,11 +134,19 @@ export const App: React.FC = () => {
     };
     initLoad();
 
-    // 5-second polling interval for telemetry
+    // 5-second polling interval for real Prometheus telemetry
     const interval = setInterval(async () => {
       try {
-        const telem = await api.getTelemetry();
-        if (telem && isMounted) setTelemetry(telem);
+        const [telem, toverview, deps] = await Promise.all([
+          api.getTelemetry().catch(() => null),
+          api.getTelemetryOverview().catch(() => null),
+          api.getDeployments().catch(() => null),
+        ]);
+        if (isMounted) {
+          if (telem) setTelemetry(telem);
+          if (toverview) setTelemetryOverview(toverview);
+          if (deps) setDeployments(deps);
+        }
       } catch {
         // silent polling catch
       }
@@ -114,7 +158,27 @@ export const App: React.FC = () => {
     };
   }, [loadAllData]);
 
-  // Handler Actions
+  // Auth Handlers
+  const handleAuthSuccess = (authenticatedUser: User, authToken: string) => {
+    setUser(authenticatedUser);
+    localStorage.setItem("traceops_user", JSON.stringify(authenticatedUser));
+    localStorage.setItem("traceops_token", authToken);
+  };
+
+  const handleLogout = async () => {
+    try {
+      await api.logout().catch(() => {});
+    } finally {
+      setUser(null);
+      localStorage.removeItem("traceops_user");
+      localStorage.removeItem("traceops_token");
+      if (activeTab === "admin") {
+        setActiveTab("overview");
+      }
+    }
+  };
+
+  // Business Action Handlers
   const handleCreateRequirement = async (data: Partial<Requirement>) => {
     await api.createRequirement(data);
     await loadAllData();
@@ -212,42 +276,66 @@ export const App: React.FC = () => {
     await loadAllData();
   };
 
+  // Navigation Tabs Configuration
   const tabs = [
-    { id: "overview", label: "Overview", icon: <Activity className="w-4 h-4" /> },
-    { id: "projects", label: "Projects", icon: <FolderGit2 className="w-4 h-4" /> },
-    { id: "repair", label: "Autonomous Repair", icon: <Wrench className="w-4 h-4" /> },
+    { id: "overview", label: "Dashboard", icon: <Activity className="w-4 h-4" /> },
+    { id: "services", label: "Services", icon: <Server className="w-4 h-4" /> },
     { id: "requirements", label: "Requirements", icon: <Layers className="w-4 h-4" /> },
-    { id: "slos", label: "SLO Registry", icon: <Zap className="w-4 h-4" /> },
+    { id: "slos", label: "SLOs", icon: <Zap className="w-4 h-4" /> },
     { id: "incidents", label: "Incidents & ML", icon: <ShieldAlert className="w-4 h-4" /> },
     { id: "rca", label: "Gemini RCA", icon: <Sparkles className="w-4 h-4" /> },
-    { id: "remediation", label: "Remediation & DevOps", icon: <FlaskConical className="w-4 h-4" /> },
+    { id: "repair", label: "Autonomous Repair", icon: <Wrench className="w-4 h-4" /> },
+    { id: "canary", label: "Canary Progression", icon: <GitMerge className="w-4 h-4" /> },
+    { id: "audit", label: "Audit Trail", icon: <Lock className="w-4 h-4" /> },
+    { id: "projects", label: "Projects & Onboarding", icon: <FolderGit2 className="w-4 h-4" /> },
     { id: "traceability", label: "Traceability Graph", icon: <GitMerge className="w-4 h-4" /> },
+    { id: "remediation", label: "Remediation & Chaos", icon: <FlaskConical className="w-4 h-4" /> },
     { id: "research", label: "Research Benchmarks", icon: <BarChart3 className="w-4 h-4" /> },
+    ...(user?.role === "ADMIN" ? [{ id: "admin", label: "Admin Console", icon: <Shield className="w-4 h-4" /> }] : []),
   ];
 
   return (
     <div className="app-container">
-      {/* 1. Professional Header Bar */}
+      {/* 1. Header Bar */}
       <header className="app-header">
         <div className="header-left">
           <div className="brand-logo">
             <Server className="w-6 h-6 text-sky-400" />
             <div>
               <span className="brand-title">TraceOps</span>
-              <span className="brand-subtitle">Requirement-Traceable DevOps Platform</span>
+              <span className="brand-subtitle">Requirement-Traceable Autonomous DevOps</span>
             </div>
           </div>
-          <span className="badge-env">RESEARCH v1.0</span>
+          <span className="badge-env">PRODUCTION READY</span>
         </div>
 
         <div className="header-right">
+          {/* User Profile / Auth Status */}
+          {user ? (
+            <div className="user-profile-menu">
+              <div className="user-avatar-small">{user.name.charAt(0).toUpperCase()}</div>
+              <div className="user-details-inline">
+                <span className="user-name-text">{user.name}</span>
+                <span className={`user-role-badge ${user.role.toLowerCase()}`}>{user.role}</span>
+              </div>
+              <button onClick={handleLogout} className="btn-logout" title="Sign Out">
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <button onClick={() => setIsAuthModalOpen(true)} className="btn-auth-header">
+              <LogIn className="w-4 h-4" />
+              <span>Sign In</span>
+            </button>
+          )}
+
           <button
             onClick={loadAllData}
             className="btn-sync"
             title="Sync all metrics & data from backend"
           >
             <RefreshCw className="w-4 h-4" />
-            <span>Sync Telemetry</span>
+            <span>Sync</span>
           </button>
         </div>
       </header>
@@ -271,7 +359,7 @@ export const App: React.FC = () => {
         {error && <ErrorState error={error} onRetry={loadAllData} />}
 
         {loading ? (
-          <LoadingState message="Synchronizing TraceOps platform telemetry..." />
+          <LoadingState message="Synchronizing TraceOps platform telemetry and state..." />
         ) : (
           <>
             {activeTab === "overview" && (
@@ -281,9 +369,26 @@ export const App: React.FC = () => {
                 incidents={incidents}
                 devopsActions={devopsActions}
                 telemetry={telemetry}
+                telemetryOverview={telemetryOverview}
+                telemetryLoading={telemetryLoading}
+                onExecuteLoadTest={async (requests, delayMs, simulateError) => {
+                  await api.executeLoadTest(requests, delayMs, simulateError);
+                  const overview = await api.getTelemetryOverview().catch(() => null);
+                  if (overview) setTelemetryOverview(overview);
+                }}
                 onTriggerSpike={handleTriggerSpike}
                 onNormalize={handleNormalize}
                 onNavigateTab={(tab) => setActiveTab(tab)}
+              />
+            )}
+
+            {activeTab === "services" && (
+              <ServicesTab
+                projects={projects}
+                requirements={requirements}
+                slos={slos}
+                incidents={incidents}
+                deployments={deployments}
               />
             )}
 
@@ -305,6 +410,12 @@ export const App: React.FC = () => {
             )}
 
             {activeTab === "repair" && <RepairTab initialProjectId={repairProjectId} />}
+
+            {activeTab === "canary" && (
+              <CanaryTab deployments={deployments} onRefresh={loadAllData} />
+            )}
+
+            {activeTab === "audit" && <AuditTrailTab deployments={deployments} />}
 
             {activeTab === "requirements" && (
               <RequirementsTab
@@ -367,9 +478,18 @@ export const App: React.FC = () => {
             )}
 
             {activeTab === "research" && <ResearchTab />}
+
+            {activeTab === "admin" && <AdminTab />}
           </>
         )}
       </main>
+
+      {/* Authentication Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onSuccess={handleAuthSuccess}
+      />
     </div>
   );
 };

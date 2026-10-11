@@ -1,3 +1,15 @@
+/**
+ * HISTORICAL_SYNTHETIC_TRAINING_DATA (Test Fixture Reference Only)
+ *
+ * PROVENANCE & LIMITATION NOTICE:
+ * This static dataset contains synthetically crafted records used in early Phase 0/1 testing.
+ * It is preserved strictly as a labeled historical reference.
+ *
+ * Under Phase 3, production runtime ML inference NEVER consumes these records.
+ * All runtime predictions are strictly derived from live Prometheus telemetry
+ * and verified incident telemetry evidence snapshots.
+ */
+
 export interface TrainingRecord {
   cpuUsage: number;
   memoryUsage: number;

@@ -6,12 +6,15 @@ export const getIncidents = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { status, service, severity } = req.query;
+    const { status, service, severity, projectId, sloId, source } = req.query;
     const filter: Record<string, any> = {};
 
     if (status) filter.status = String(status);
     if (service) filter.service = String(service);
     if (severity) filter.severity = String(severity);
+    if (projectId) filter.projectId = String(projectId);
+    if (sloId) filter.sloId = String(sloId);
+    if (source) filter.source = String(source);
 
     const incidents = await Incident.find(filter).sort({ createdAt: -1 });
 
@@ -105,20 +108,23 @@ export const createIncident = async (
       metric,
       actualValue,
       threshold,
+      targetValue: req.body.targetValue !== undefined ? req.body.targetValue : threshold,
+      operator: req.body.operator || "<",
       severity: severity || "CRITICAL",
       status: "OPEN",
+      source: req.body.source || "MANUAL",
+      promQl: req.body.promQl,
+      evaluationWindow: req.body.evaluationWindow || "5m",
+      evaluatedAt: req.body.evaluatedAt || new Date(),
       message:
         message ||
         `SLO breach on ${service} (${metric}: ${actualValue} vs target ${threshold})`,
       logs: logs || [
-        `[${new Date().toISOString()}] Warning: Threshold exceeded for metric ${metric} on service ${service}.`,
-        `[${new Date().toISOString()}] Active connection count saturated.`,
+        `[${new Date().toISOString()}] Incident recorded for ${service} (${metric}: ${actualValue} vs threshold ${threshold}).`,
       ],
       metrics: metrics || {
-        cpuUsage: 92,
-        memoryUsage: 60,
-        errorRate: 2.0,
-        latency: actualValue,
+        latency: metric.includes("latency") ? actualValue : undefined,
+        errorRate: metric.includes("error") ? actualValue : undefined,
         deploymentChanged: false,
       },
     });

@@ -18,10 +18,10 @@ export const RequirementsTab: React.FC<RequirementsTabProps> = ({
   const [showModal, setShowModal] = useState(false);
   const [search, setSearch] = useState("");
   const [formData, setFormData] = useState<Partial<Requirement>>({
-    requirementId: "REQ-001",
+    requirementId: "",
     title: "",
     description: "",
-    service: "Checkout",
+    service: "",
     metric: "p95_latency",
     threshold: 2.0,
     unit: "seconds",

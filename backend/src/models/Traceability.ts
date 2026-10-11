@@ -8,7 +8,10 @@ export interface ITraceability extends Document {
   service: string;
   metric: string;
   issueId?: string;
+  incidentId?: string;
+  rcaId?: string;
   repairId?: string;
+  evidenceSnapshotHash?: string;
   deploymentId?: string;
   prometheusMetric?: string;
   runtimeResource?: string;
@@ -60,7 +63,24 @@ const traceabilitySchema = new Schema<ITraceability>(
       trim: true,
     },
 
+    incidentId: {
+      type: String,
+      trim: true,
+      index: true,
+    },
+
+    rcaId: {
+      type: String,
+      trim: true,
+      index: true,
+    },
+
     repairId: {
+      type: String,
+      trim: true,
+    },
+
+    evidenceSnapshotHash: {
       type: String,
       trim: true,
     },

@@ -1,31 +1,31 @@
 groups:
   - name: traceops_slo_alerts
     rules:
-      - alert: CheckoutLatencySLOViolation
-        expr: http_request_duration_seconds{service="Checkout"} > 2.0
+      - alert: BackendLatencySLOViolation
+        expr: histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket[1m]))) > 2.0
         for: 1m
         labels:
           severity: critical
-          requirementId: REQ-001
-          service: Checkout
+          service: traceops-backend
         annotations:
-          summary: "Checkout latency breached 2.0s SLO threshold"
-          description: "Current p95 latency is {{ $value }}s on Checkout service."
+          summary: "TraceOps backend latency breached 2.0s SLO threshold"
+          description: "Current measured p95 latency is {{ $value }}s on TraceOps backend."
 
-      - alert: ServiceHighCPUUtilization
-        expr: service_cpu_utilization_percent > 85
+      - alert: HostHighCPUUtilization
+        expr: (100 - (avg(rate(node_cpu_seconds_total{mode="idle"}[1m])) * 100)) > 85
         for: 2m
         labels:
           severity: warning
+          tier: host
         annotations:
-          summary: "Service CPU load elevated"
-          description: "Service {{ $labels.service }} CPU is at {{ $value }}%."
+          summary: "Host CPU load elevated"
+          description: "Host CPU utilization is at {{ $value }}%."
 
       - alert: HighErrorRateBreach
-        expr: service_error_rate_percent > 1.0
+        expr: ((sum(rate(http_requests_total{status_class=~"4xx|5xx"}[1m])) or vector(0)) / (sum(rate(http_requests_total[1m])) or vector(1))) * 100 > 5.0
         for: 1m
         labels:
           severity: critical
         annotations:
-          summary: "Service Error Rate breached threshold"
-          description: "Service {{ $labels.service }} is experiencing {{ $value }}% errors."
+          summary: "HTTP Error Rate breached threshold"
+          description: "Error rate is experiencing {{ $value }}% across active routes."

@@ -8,16 +8,27 @@ rule_files:
 scrape_configs:
   - job_name: "traceops-backend"
     metrics_path: "/metrics"
-    static_configs:
-      - targets: ["backend:5000", "host.docker.internal:5000", "localhost:5000"]
-        labels:
-          environment: "production"
-          cluster: "traceops-k8s"
-
-  - job_name: "traceops-services"
-    metrics_path: "/api/metrics/prometheus"
     scrape_interval: 3s
     static_configs:
-      - targets: ["backend:5000", "host.docker.internal:5000", "localhost:5000"]
+      - targets: ["backend:5000"]
         labels:
-          tier: "microservices"
+          environment: "production"
+          service: "traceops-backend"
+
+  - job_name: "node-exporter"
+    metrics_path: "/metrics"
+    scrape_interval: 5s
+    static_configs:
+      - targets: ["node-exporter:9100"]
+        labels:
+          environment: "production"
+          tier: "host"
+
+  - job_name: "cadvisor"
+    metrics_path: "/metrics"
+    scrape_interval: 5s
+    static_configs:
+      - targets: ["cadvisor:8080"]
+        labels:
+          environment: "production"
+          tier: "containers"

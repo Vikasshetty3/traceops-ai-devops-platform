@@ -1,5 +1,14 @@
 import mongoose, { Document, Schema } from "mongoose";
 
+export interface ISLOEvaluationRecord {
+  status: "COMPLIANT" | "BREACHED" | "NO_DATA" | "ERROR";
+  actualValue: number | null;
+  target: number;
+  evaluatedAt: Date;
+  promQl: string;
+  errorMessage?: string;
+}
+
 export interface ISLO extends Document {
   sloId: string;
   projectId?: string;
@@ -16,6 +25,8 @@ export interface ISLO extends Document {
   sloType?: "EXPLICIT" | "INFERRED";
   sourceFile?: string;
   confidence?: number;
+  promQl?: string;
+  latestEvaluation?: ISLOEvaluationRecord;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -93,6 +104,32 @@ const sloSchema = new Schema<ISLO>(
     confidence: {
       type: Number,
       default: 1.0,
+    },
+    promQl: {
+      type: String,
+      trim: true,
+    },
+    latestEvaluation: {
+      status: {
+        type: String,
+        enum: ["COMPLIANT", "BREACHED", "NO_DATA", "ERROR"],
+      },
+      actualValue: {
+        type: Number,
+        default: null,
+      },
+      target: {
+        type: Number,
+      },
+      evaluatedAt: {
+        type: Date,
+      },
+      promQl: {
+        type: String,
+      },
+      errorMessage: {
+        type: String,
+      },
     },
   },
   {

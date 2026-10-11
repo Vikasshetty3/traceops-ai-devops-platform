@@ -34,8 +34,8 @@ export const RemediationTab: React.FC<RemediationTabProps> = ({
 
   // Experiment Form
   const [simForm, setSimForm] = useState({
-    requirementId: "REQ-001",
-    service: "Checkout",
+    requirementId: "",
+    service: "",
     remediationAction: "Increase DB Connection Pool",
     parameterName: "DB Connection Pool",
     currentValue: 20,

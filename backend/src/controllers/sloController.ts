@@ -63,6 +63,7 @@ export const createSLO = async (req: Request, res: Response): Promise<void> => {
   try {
     const {
       sloId,
+      projectId,
       requirementId,
       service,
       metric,
@@ -73,6 +74,7 @@ export const createSLO = async (req: Request, res: Response): Promise<void> => {
       window,
       severity,
       status,
+      promQl,
     } = req.body;
 
     if (!sloId || !requirementId || !service || !metric || threshold === undefined) {
@@ -86,6 +88,7 @@ export const createSLO = async (req: Request, res: Response): Promise<void> => {
 
     const slo = await SLO.create({
       sloId,
+      projectId,
       requirementId,
       service,
       metric,
@@ -96,6 +99,7 @@ export const createSLO = async (req: Request, res: Response): Promise<void> => {
       window: window || "5m",
       severity: severity || "CRITICAL",
       status: status || "ACTIVE",
+      promQl,
     });
 
     res.status(201).json({
@@ -170,6 +174,68 @@ export const deleteSLO = async (req: Request, res: Response): Promise<void> => {
     res.status(500).json({
       success: false,
       message: "Failed to delete SLO",
+      error: error instanceof Error ? error.message : error,
+    });
+  }
+};
+
+export const getSLOMonitorStatus = async (
+  _req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { sloMonitoringDaemon } = await import("../services/sloMonitoringDaemon");
+    res.status(200).json({
+      success: true,
+      data: sloMonitoringDaemon.getStatus(),
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to get SLO monitor status",
+      error: error instanceof Error ? error.message : error,
+    });
+  }
+};
+
+export const triggerSLOEvaluationCycle = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { sloMonitoringDaemon } = await import("../services/sloMonitoringDaemon");
+    const { sloId } = req.body || {};
+
+    if (sloId) {
+      const slo = await SLO.findOne({ sloId, status: "ACTIVE" });
+      if (!slo) {
+        res.status(404).json({
+          success: false,
+          message: `Active SLO ${sloId} not found`,
+        });
+        return;
+      }
+      const result = await sloMonitoringDaemon.evaluateSLO(slo);
+      res.status(200).json({
+        success: true,
+        message: `SLO evaluation completed for ${sloId}`,
+        count: 1,
+        data: [result],
+      });
+      return;
+    }
+
+    const results = await sloMonitoringDaemon.evaluateAllSLOs();
+    res.status(200).json({
+      success: true,
+      message: `SLO evaluation completed for ${results.length} active SLOs`,
+      count: results.length,
+      data: results,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to execute SLO evaluation cycle",
       error: error instanceof Error ? error.message : error,
     });
   }

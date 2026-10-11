@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "ts-node src/server.ts",
     "build": "tsc",
-    "start": "node dist/server.js"
+    "start": "node dist/server.js",
+    "train:runtime": "ts-node src/trainRuntimePipeline.ts",
+    "train:synthetic-research": "ts-node src/train.ts"
   },
   "dependencies": {
     "cors": "^2.8.5",

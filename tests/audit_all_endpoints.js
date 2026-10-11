@@ -16,7 +16,7 @@ const tests = [
     name: "ML Predict Route",
     method: "POST",
     url: "http://localhost:5000/api/ml/predict",
-    body: { cpuUsage: 92, memoryUsage: 60, errorRate: 2.0, latency: 2.8, deploymentChanged: 0 }
+    body: { service: "Checkout", cpuUsage: 92, memoryUsage: 60, errorRate: 2.0, latency: 2.8, requestRate: 2.5, deploymentChanged: 0 }
   },
   {
     name: "Gemini RCA Route",
